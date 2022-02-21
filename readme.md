@@ -8,6 +8,9 @@ https://www.bilibili.com/video/BV1FL4y147DN?share_source=copy_web
 
 2022/02/07 20:44 Dev Snapshot
 
+refracting new ui.
+![](dev/Snipaste_2022-02-21_22-38-17.png)
+
 ![](dev/Snipaste_2022-02-07_21-56-08.png)
 ![](dev/Snipaste_2022-02-07_22-00-27.png)
 
