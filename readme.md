@@ -6,7 +6,7 @@ https://www.youtube.com/watch?v=ciw8UOmaFaI
 
 https://www.bilibili.com/video/BV1FL4y147DN?share_source=copy_web
 
-2022/02/07 20:44 Dev Snapshot
+2022/02/21 20:44 Dev Snapshot
 
 refracting new ui.
 ![](dev/Snipaste_2022-02-21_22-38-17.png)
