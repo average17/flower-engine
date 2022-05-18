@@ -1,115 +1,68 @@
 #pragma once
-#include "../core/runtime_module.h"
-#include "imgui_pass.h"
-#include "render_scene.h"
-#include "../shader_compiler/shader_compiler.h"
-#include "frame_data.h"
+#include "../Core/RuntimeModule.h"
+#include "../Core/Delegates.h"
 
+#include "ImGuiPass.h"
+#include "RenderTexturePool.h"
 
-namespace engine{
-
-extern bool  reverseZOpen();
-extern float getEngineClearZFar();
-extern float getEngineClearZNear();
-extern VkCompareOp getEngineZTestFunc();
-extern float getExposure();
-extern bool TAAOpen();
-
-class GraphicsPass;
-class GpuCullingPass;
-class ShadowDepthPass;
-class GpuDepthEvaluateMinMaxPass;
-class GpuCascadeSetupPass;
-class TAAPass;
-class DownSamplePass;
-class BloomPass;
-
-extern bool gRenderDocCapture;
-
-class Renderer : public IRuntimeModule
+namespace flower
 {
-public:
-	Renderer(Ref<ModuleManager>);
-	
-public:
-	typedef void (RegisterImguiFunc)(size_t);
+	constexpr uint32_t MIN_RENDER_SIZE = 64;
 
-	virtual bool init() override;
-	virtual void tick(float dt) override;
-	virtual void release() override;
+	// for renderer module.
+	// you should always add uisystem module.
 
-	void addImguiFunction(std::string name,std::function<RegisterImguiFunc>&& func)
+	// simple renderer interface.
+	class Renderer : public IRuntimeModule
 	{
-		this->m_uiFunctions[name] = func; 
-	}
-	void removeImguiFunction(std::string name)
+	public:
+		Renderer(ModuleManager* in, std::string name = "Renderer");
+		virtual ~Renderer() {  }
+
+		virtual void registerCheck() override;
+
+		virtual bool init() override;
+		virtual void release() override;
+
+		// i offer a simple tick function here for reference.
+		// you can override if you need.
+		virtual void tick(const TickData&) override;
+
+	protected:
+		std::unique_ptr<ImguiPass> m_ui = nullptr;
+	};
+
+	class OffscreenRenderer: public Renderer
 	{
-		this->m_uiFunctions.erase(name);
-	}
+	public:
+		OffscreenRenderer(ModuleManager* in, std::string name = "OffscreenRenderer");
+		virtual ~OffscreenRenderer() {  }
 
-	void UpdateScreenSize(uint32 width,uint32 height);
-	RenderScene& getRenderScene() { return *m_renderScene; }
-	PerFrameData& getFrameData() { return m_frameData; }
+		virtual bool init() override;
+		virtual void release() override;
 
-private:
-	ImguiPass* m_uiPass;
-	RenderScene* m_renderScene;
-	PerFrameData m_frameData { };
+		uint32_t getRenderWidth() const { return m_offscreenRenderWidth; }
+		uint32_t getRenderHeight() const { return m_offscreenRenderHeight; }
 
-	// 动态描述符申请，每次ScreenSize改变时重置。
-	std::vector<VulkanDescriptorAllocator*> m_dynamicDescriptorAllocator{};
+	protected:
+		uint32_t m_offscreenRenderWidth  = MIN_RENDER_SIZE;
+		uint32_t m_offscreenRenderHeight = MIN_RENDER_SIZE;
 
-private:
-	void uiRecord(size_t i);
+		// common dynamic command buffer meaning it update every frame.
+		std::array<VulkanCommandBuffer*, MAX_FRAMES_IN_FLIGHT> m_dynamicGraphicsCommandBuffer;
+		std::array<VkSemaphore,MAX_FRAMES_IN_FLIGHT> m_dynamicGraphicsCommandExecuteSemaphores;
 
-	std::unordered_map<std::string,std::function<RegisterImguiFunc>> m_uiFunctions{};
-	bool show_demo_window = true;
-	bool show_another_window = false;
+		// async compute.
 
-	uint32 m_screenViewportWidth = ScreenTextureInitSize;
-	uint32 m_screenViewportHeight = ScreenTextureInitSize;
+	};
 
-	GPUFrameData m_gpuFrameData { };
-	void updateGPUData(float dt);
 
-	uint32 m_frameCount = 0;
+	struct RenderStateMonitor
+	{
+		DelegatesSingleThread<RenderStateMonitor> callbacks;
 
-	bool bStopMoveView = false;
-	uint32 m_cameraStopMoveFrameCount = 0;
-	float cameraStopFactor = 0.0f;
+		void broadcast() { callbacks.broadcast(); }
+	};
 
-	glm::mat4 m_lastVP;
-	glm::mat4 m_currentVP;
-	void updateCameraStopFactor();
-
-public:
-	VulkanDescriptorAllocator& getDynamicDescriptorAllocator(uint32 i);
-	VulkanDescriptorFactory vkDynamicDescriptorFactoryBegin(uint32 i);
-
-	uint32 getFrameCount() const;
-	float getCameraStopFactor() const;
-	bool cameraMove() const;
-
-public:
-
-	GpuCullingPass* m_gbufferCullingPass;
-	GraphicsPass*   m_gbufferPass;
-	GpuDepthEvaluateMinMaxPass* m_depthEvaluateMinMaxPass;
-	GpuCascadeSetupPass* m_cascadeSetupPass;
-
-	GpuCullingPass* m_cascasdeCullingPasses;
-	ShadowDepthPass* m_shadowdepthPasses;
-
-	GraphicsPass*   m_lightingPass;
-	GraphicsPass* m_pmxPass;
-	DownSamplePass* m_downsamplePass;
-	BloomPass* m_bloomPass;
-
-	TAAPass* m_taaPass;
-	GraphicsPass*   m_tonemapperPass;
-
-private:
-	void prepareBasicTextures();
-};
-
+	extern RenderStateMonitor GRenderStateMonitor;
 }

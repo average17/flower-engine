@@ -1,0 +1,26 @@
+#version 460
+
+#define LOCAL_SIZE_XY 16
+layout (local_size_x = LOCAL_SIZE_XY, local_size_y = LOCAL_SIZE_XY, local_size_z = 1) in;
+
+#include "SSAOCommon.glsl"
+
+// Temp in, GTAO out.
+void main()
+{
+	ivec2 pixelPos = ivec2(gl_GlobalInvocationID.xy);
+
+    // fallback fill.
+    ivec2 workSize = imageSize(GTAOImage);
+    imageStore(GTAOImage, pixelPos, vec4(1.0));
+
+    if(pixelPos.x >= workSize.x || pixelPos.y >= workSize.y)
+    {
+        return;
+    }
+
+    vec2 texelSize = 1.0f / vec2(workSize);
+    vec2 uv        = (vec2(pixelPos) + vec2(0.5)) * texelSize; 
+
+    imageStore(GTAOImage, pixelPos, vec4(bilateralBlur(uv, vec2(0, texelSize.y), inGTAOTempFilter).xy, 1, 1));
+}

@@ -1,8 +1,6 @@
-#include "timer.h"
-#include "../core/core.h"
+#include "Timer.h"
 
-namespace engine{
-
-Timer g_timer;
-
+namespace flower
+{
+	Timer GTimer = {};
 }

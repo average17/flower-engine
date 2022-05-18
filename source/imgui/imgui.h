@@ -656,7 +656,7 @@ namespace ImGui
     IMGUI_API bool          BeginMainMenuBar();                                                 // create and append to a full screen menu-bar.
     IMGUI_API void          EndMainMenuBar();                                                   // only call EndMainMenuBar() if BeginMainMenuBar() returns true!
     
-    IMGUI_API bool          BeginDownBar(); 
+    IMGUI_API bool          BeginDownBar(float heightScale = 1.0f); 
     IMGUI_API void          EndDownBar(); 
     
     IMGUI_API bool          BeginMenu(const char* label, bool enabled = true);                  // create a sub-menu entry. only call EndMenu() if this returns true!

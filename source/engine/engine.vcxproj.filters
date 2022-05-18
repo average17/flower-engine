@@ -1,144 +1,456 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="core\log.cpp" />
-    <ClCompile Include="engine.cpp" />
-    <ClCompile Include="core\runtime_module.cpp" />
-    <ClCompile Include="core\timer.cpp" />
-    <ClCompile Include="vk\vk_rhi.cpp" />
-    <ClCompile Include="vk\impl\vk_device.cpp" />
-    <ClCompile Include="vk\impl\vk_instance.cpp" />
-    <ClCompile Include="vk\impl\vk_swapchain.cpp" />
-    <ClCompile Include="vk\impl\vk_buffer.cpp" />
-    <ClCompile Include="vk\impl\vk_cmdbuffer.cpp" />
-    <ClCompile Include="vk\impl\vk_image.cpp" />
-    <ClCompile Include="vk\impl\vk_descriptor.cpp" />
-    <ClCompile Include="renderer\renderer.cpp" />
-    <ClCompile Include="asset_system\asset_common.cpp" />
-    <ClCompile Include="launch\glfw_window.cpp" />
-    <ClCompile Include="core\input.cpp" />
-    <ClCompile Include="core\windowData.cpp" />
-    <ClCompile Include="renderer\imgui_pass.cpp" />
-    <ClCompile Include="renderer\render_scene.cpp" />
-    <ClCompile Include="renderer\scene_textures.cpp" />
-    <ClCompile Include="scene\scene.cpp" />
-    <ClCompile Include="scene\components\transform.cpp" />
-    <ClCompile Include="renderer\render_passes\gbuffer_pass.cpp" />
-    <ClCompile Include="renderer\render_passes\lighting_pass.cpp" />
-    <ClCompile Include="asset_system\asset_texture.cpp" />
-    <ClCompile Include="asset_system\asset_system.cpp" />
-    <ClCompile Include="vk\impl\vk_sampler.cpp" />
-    <ClCompile Include="core\crc.cpp" />
-    <ClCompile Include="renderer\render_passes\tonemapper_pass.cpp" />
-    <ClCompile Include="renderer\pass_interface.cpp" />
-    <ClCompile Include="vk\impl\vk_factory.cpp" />
-    <ClCompile Include="scene\components\staticmesh_renderer.cpp" />
-    <ClCompile Include="renderer\mesh.cpp" />
-    <ClCompile Include="renderer\material.cpp" />
-    <ClCompile Include="core\job_system.cpp" />
-    <ClCompile Include="asset_system\asset_mesh.cpp" />
-    <ClCompile Include="shader_compiler\shader_compiler.cpp" />
-    <ClCompile Include="renderer\frame_data.cpp" />
-    <ClCompile Include="renderer\texture.cpp" />
-    <ClCompile Include="scene\components\script_component.cpp" />
-    <ClCompile Include="scene\components\sceneview_camera.cpp" />
-    <ClCompile Include="renderer\render_passes\cascade_shadowdepth_pass.cpp" />
-    <ClCompile Include="scene\components\directionalLight.cpp" />
-    <ClCompile Include="vk\impl\vk_fence.cpp" />
-    <ClCompile Include="renderer\render_prepare.cpp" />
-    <ClCompile Include="renderer\compute_passes\gpu_culling.cpp" />
-    <ClCompile Include="renderer\compute_passes\depth_evaluate_minmax.cpp" />
-    <ClCompile Include="renderer\compute_passes\cascade_setup.cpp" />
-    <ClCompile Include="renderer\compute_passes\brdf_lut.cpp" />
-    <ClCompile Include="renderer\frame_graph\frame_graph.cpp" />
-    <ClCompile Include="renderer\compute_passes\irradiance_prefiltercube.cpp" />
-    <ClCompile Include="renderer\compute_passes\specular_prefilter.cpp" />
-    <ClCompile Include="renderer\compute_passes\taa.cpp" />
-    <ClCompile Include="renderer\compute_passes\downsample.cpp" />
-    <ClCompile Include="renderer\render_passes\bloom.cpp" />
-    <ClCompile Include="renderer\rendertarget_pool.cpp" />
-    <ClCompile Include="asset_system\asset_pmx.cpp" />
-    <ClCompile Include="renderer\pmx_mesh.cpp" />
-    <ClCompile Include="scene\components\pmx_mesh_component.cpp" />
-    <ClCompile Include="asset_system\unicode.cpp" />
-    <ClCompile Include="renderer\render_passes\pmx_pass.cpp" />
+    <Filter Include="源文件">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="头文件">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="资源文件">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="core\cvar.h" />
-    <ClInclude Include="core\log.h" />
-    <ClInclude Include="core\core.h" />
-    <ClInclude Include="core\runtime_module.h" />
-    <ClInclude Include="engine.h" />
-    <ClInclude Include="core\timer.h" />
-    <ClInclude Include="core\noncopyable.h" />
-    <ClInclude Include="async\book_cpp_concurrency_action.h" />
-    <ClInclude Include="vk\vk_rhi.h" />
-    <ClInclude Include="core\file_system.h" />
-    <ClInclude Include="vk\impl\vk_buffer.h" />
-    <ClInclude Include="vk\impl\vk_common.h" />
-    <ClInclude Include="vk\impl\vk_device.h" />
-    <ClInclude Include="vk\impl\vk_instance.h" />
-    <ClInclude Include="vk\impl\vk_swapchain.h" />
-    <ClInclude Include="vk\impl\vk_cmdbuffer.h" />
-    <ClInclude Include="vk\impl\vk_image.h" />
-    <ClInclude Include="vk\impl\vk_descriptor.h" />
-    <ClInclude Include="vk\impl\vk_factory.h" />
-    <ClInclude Include="vk\impl\vk_sampler.h" />
-    <ClInclude Include="vk\impl\vk_shader.h" />
-    <ClInclude Include="core\deletion_queue.h" />
-    <ClInclude Include="renderer\renderer.h" />
-    <ClInclude Include="asset_system\asset_common.h" />
-    <ClInclude Include="launch\launch_engine_loop.h" />
-    <ClInclude Include="core\input_code.h" />
-    <ClInclude Include="core\input.h" />
-    <ClInclude Include="core\windowData.h" />
-    <ClInclude Include="renderer\imgui_pass.h" />
-    <ClInclude Include="renderer\render_scene.h" />
-    <ClInclude Include="renderer\scene_textures.h" />
-    <ClInclude Include="scene\scene.h" />
-    <ClInclude Include="scene\component.h" />
-    <ClInclude Include="scene\components\transform.h" />
-    <ClInclude Include="scene\scene_node.h" />
-    <ClInclude Include="renderer\render_passes\gbuffer_pass.h" />
-    <ClInclude Include="renderer\render_passes\lighting_pass.h" />
-    <ClInclude Include="asset_system\asset_texture.h" />
-    <ClInclude Include="asset_system\asset_system.h" />
-    <ClInclude Include="core\crc.h" />
-    <ClInclude Include="renderer\render_passes\tonemapper_pass.h" />
-    <ClInclude Include="renderer\pass_interface.h" />
-    <ClInclude Include="scene\components\staticmesh_renderer.h" />
-    <ClInclude Include="renderer\mesh.h" />
-    <ClInclude Include="renderer\material.h" />
-    <ClInclude Include="core\job_system.h" />
-    <ClInclude Include="asset_system\asset_mesh.h" />
-    <ClInclude Include="shader_compiler\shader_compiler.h" />
-    <ClInclude Include="renderer\frame_data.h" />
-    <ClInclude Include="renderer\texture.h" />
-    <ClInclude Include="scene\components\script_component.h" />
-    <ClInclude Include="scene\components\camera_component.h" />
-    <ClInclude Include="scene\components\sceneview_camera.h" />
-    <ClInclude Include="renderer\render_passes\cascade_shadowdepth_pass.h" />
-    <ClInclude Include="scene\components\directionalLight.h" />
-    <ClInclude Include="vk\impl\vk_fence.h" />
-    <ClInclude Include="renderer\render_prepare.h" />
-    <ClInclude Include="renderer\compute_passes\gpu_culling.h" />
-    <ClInclude Include="renderer\frustum.h" />
-    <ClInclude Include="renderer\compute_passes\depth_evaluate_minmax.h" />
-    <ClInclude Include="renderer\compute_passes\cascade_setup.h" />
-    <ClInclude Include="renderer\compute_passes\brdf_lut.h" />
-    <ClInclude Include="renderer\frame_graph\define.h" />
-    <ClInclude Include="renderer\frame_graph\frame_graph.h" />
-    <ClInclude Include="renderer\compute_passes\irradiance_prefiltercube.h" />
-    <ClInclude Include="renderer\compute_passes\specular_prefilter.h" />
-    <ClInclude Include="renderer\compute_passes\taa.h" />
-    <ClInclude Include="renderer\compute_passes\bloom.h" />
-    <ClInclude Include="renderer\compute_passes\downsample.h" />
-    <ClInclude Include="renderer\render_passes\bloom.h" />
-    <ClInclude Include="renderer\rendertarget_pool.h" />
-    <ClInclude Include="asset_system\asset_pmx.h" />
-    <ClInclude Include="renderer\pmx_mesh.h" />
-    <ClInclude Include="scene\components\pmx_mesh_component.h" />
-    <ClInclude Include="asset_system\unicode.h" />
-    <ClInclude Include="renderer\render_passes\pmx_pass.h" />
+    <ClCompile Include="Core\WindowData.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Log.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\RuntimeModule.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\UtilsPath.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Launcher\Launcher.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Buffer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Device.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Instance.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\RHI.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\CommandBuffer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Descriptor.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Factory.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Fence.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Image.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Sampler.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\SwapChain.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\SceneGraph.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Asset\AssetCommon.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Asset\AssetMesh.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Asset\AssetSystem.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Asset\AssetTexture.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Async\Taskflow.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\Renderer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Component\Transform.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\SceneNode.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\ImGuiPass.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\ImGuiCommon.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\UISystem.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\DefferedRenderer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Async\AsyncThread.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\Icon.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\SceneManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\SceneTextures.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Timer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\RenderTexturePool.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\Material.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\Mesh.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\UUID.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Bindless.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Component\DirectionalLightComponent.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\RenderScene.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\SceneViewCamera.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Component\StaticMeshComponent.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\Pass\LightingPass.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\Pass\TonemapperPass.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\Pass\GBufferPass.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\Pass\PassCommon.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Component.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Asset\AssetMaterial.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\ObjectUpload.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\Pass\CullingPass.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\Pass\SDSMPass.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\Pass\TAAPass.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\Pass\BRDFLut.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\Pass\SpecularCaptureFilter.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\Pass\Bloom.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\Pass\HizBuild.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\Pass\SSAO.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\Pass\SSSR.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\Pass\BlueNoise.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\DeferredRenderer\Pass\EpciAtmosphere.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Core\Core.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\CVar.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\DeletionQueue.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\InputCode.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\WindowData.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Log.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\NonCopyable.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\RuntimeModule.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\TickData.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Timer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\UtilsPath.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Launcher\Launcher.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Buffer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Device.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Error.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Instance.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHI.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Common.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\CommandBuffer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Descriptor.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Factory.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Fence.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Image.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Sampler.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Shader.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\SwapChain.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\SceneGraph.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Asset\AssetCommon.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Asset\AssetMesh.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Asset\AssetSystem.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Asset\AssetTexture.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Async\Taskflow.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\Renderer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\Component.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\Component\Transform.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\SceneNode.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\ImGuiPass.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\ImGuiCommon.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\UISystem.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Launcher\LauncherInfo.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\DefferedRenderer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Async\AsyncThread.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\Icon.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\SceneManager.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Singleton.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\SceneTextures.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\RenderTexturePool.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Async\LockFreeSPSCQueue.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Delegates.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\String.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\RefCounter.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\Mesh.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\Material.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\UUID.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Bindless.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\Component\DirectionalLightComponent.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\SceneStaticUniform.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\RenderScene.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\SceneViewCamera.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\Component\StaticMeshComponent.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\Pass\LightingPass.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\Pass\TonemapperPass.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\Pass\GBufferPass.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\Pass\PassCommon.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\Component\AtmosphereSky.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Asset\AssetMaterial.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\ObjectUpload.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Async\WorkStealingQueue.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Async\Condition.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Async\Concurrentqueue.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\Pass\CullingPass.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\Pass\SDSMPass.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\Pass\TAAPass.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\Pass\BRDFLut.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\Pass\SpecularCaptureFilter.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\Pass\Bloom.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\Pass\HizBuild.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\Pass\SSAO.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\Pass\SSSR.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\Pass\BlueNoise.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\Pass\EpicAtmosphere.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\DeferredRenderer\BlueNoise.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

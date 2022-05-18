@@ -1,111 +1,69 @@
-#include "material.h"
-#include "mesh.h"
-#include "texture.h"
-#include "renderer.h"
-#include <filesystem>
-#include <future>
-#include "../core/file_system.h"
-#include "frame_data.h"
+#include "Material.h"
+#include "../Asset/AssetSystem.h"
+#include "../Engine.h"
+#include "../Asset/AssetMesh.h"
+#include "../Asset/AssetMaterial.h"
+#include "../Asset/AssetTexture.h"
+#include "DeferredRenderer/SceneStaticUniform.h"
 
-using namespace engine;
-
-MaterialLibrary* engine::MaterialLibrary::s_materialLibrary = new MaterialLibrary();
-
-MaterialLibrary::MaterialLibrary()
+namespace flower
 {
-	m_callBackMaterial.baseColorTexture = s_defaultCheckboardTextureName;
-	m_callBackMaterial.emissiveTexture = s_defaultEmissiveTextureName;
-	m_callBackMaterial.normalTexture = s_defaultNormalTextureName;
-	m_callBackMaterial.specularTexture = s_defaultBlackTextureName;
-}
-
-engine::MaterialLibrary::~MaterialLibrary()
-{
-	for(auto& pair : m_materialContainer)
+	GBufferMaterial flower::GBufferMaterial::buildFallback()
 	{
-		delete pair.second;
-	}
-	m_materialContainer.clear();
-}
+		GBufferMaterial result {};
 
-std::unordered_map<std::string,Material*>& engine::MaterialLibrary::getContainer()
-{
-	return m_materialContainer;
-}
+		auto* textureManager = GEngine.getRuntimeModule<AssetSystem>()->getTextureManager();
 
-MaterialLibrary* engine::MaterialLibrary::get()
-{
-	return s_materialLibrary;
-}
+		result.shadingModel = EShadingModel::DisneyBRDF;
+		{
+			auto* whiteTex =  textureManager->getEngineImage(engineImages::white);
 
-bool engine::MaterialLibrary::existMaterial(const std::string& name)
-{
-	return m_materialContainer.find(name) != m_materialContainer.end();
-}
+			result.parameters.DisneyBRDF.cutoff = 1.0f;
+			result.parameters.DisneyBRDF.baseColorId = whiteTex->textureIndex;
+			result.parameters.DisneyBRDF.baseColorSampler = whiteTex->samplerIndex;
+		}
 
-Material* engine::MaterialLibrary::createEmptyMaterialAsset(const std::string& name)
-{
-	if(existMaterial(name))
-	{
-		return m_materialContainer[name];
+		{
+			auto* normalInfo = textureManager->getEngineImage(engineImages::defaultNormal);
+			result.parameters.DisneyBRDF.normalTexId = normalInfo->textureIndex;
+			result.parameters.DisneyBRDF.normalSampler = normalInfo->samplerIndex;
+
+		}
+
+		{
+			auto* specularInfo = textureManager->getEngineImage(engineImages::white);
+			result.parameters.DisneyBRDF.specularTexId = specularInfo->textureIndex;
+			result.parameters.DisneyBRDF.specularSampler = specularInfo->samplerIndex;
+		}
+
+		{
+			auto* emissiveInfo = textureManager->getEngineImage(engineImages::black);
+
+			result.parameters.DisneyBRDF.emissiveTexId = emissiveInfo->textureIndex;
+			result.parameters.DisneyBRDF.emissiveSampler = emissiveInfo->samplerIndex;
+		}
+		
+
+		return result;
 	}
 
-	auto* newMat = new Material();
-	m_materialContainer[name] = newMat;
-
-	std::ofstream os(name);
-	cereal::JSONOutputArchive archive(os);
-	archive(*newMat);
-
-	return newMat;
-}
-
-Material* engine::MaterialLibrary::getMaterial(const std::string& name)
-{
-	if(existMaterial(name))
+	GPUMaterialData GBufferMaterial::toGPUMaterialData() const
 	{
-		return m_materialContainer[name];
+		GPUMaterialData result {};
+
+		result.shadingModel = (uint32_t)this->shadingModel;
+		result.cutoff = this->parameters.DisneyBRDF.cutoff;
+		result.baseColorId  = this->parameters.DisneyBRDF.baseColorId;
+		result.baseColorSampler  = this->parameters.DisneyBRDF.baseColorSampler;
+		result.normalSampler  = this->parameters.DisneyBRDF.normalSampler;
+		result.normalTexId  = this->parameters.DisneyBRDF.normalTexId;
+		result.emissiveSampler  = this->parameters.DisneyBRDF.emissiveSampler;
+		result.emissiveTexId  = this->parameters.DisneyBRDF.emissiveTexId;
+		result.specularSampler  = this->parameters.DisneyBRDF.specularSampler;
+		result.specularTexId  = this->parameters.DisneyBRDF.specularTexId;
+
+		return result;
 	}
 
-	auto newMat = new Material();
-	m_materialContainer[name] = newMat;
-
-	std::ifstream os(name);
-	cereal::JSONInputArchive iarchive(os);
-	iarchive(*newMat);
-
-	return newMat;
 }
 
-Material& engine::MaterialLibrary::getCallbackMaterial()
-{
-	return m_callBackMaterial;
-}
-
-GPUMaterialData engine::Material::getGPUMaterialData()
-{
-	if(bSomeTextureLoading)
-	{
-		bool bLoading = false;
-
-		auto baseColorData = TextureLibrary::get()->getCombineTextureByName(baseColorTexture);
-		m_cacheGPUMaterialData.baseColorTexId = baseColorData.second.bindingIndex;
-		bLoading = bLoading || ( baseColorData.first == ERequestTextureResult::Loading );
-
-		auto normalData = TextureLibrary::get()->getCombineTextureByName(normalTexture);
-		m_cacheGPUMaterialData.normalTexId = normalData.second.bindingIndex;
-		bLoading = bLoading || ( normalData.first == ERequestTextureResult::Loading );
-
-		auto specularData = TextureLibrary::get()->getCombineTextureByName(specularTexture);
-		m_cacheGPUMaterialData.specularTexId = specularData.second.bindingIndex;
-		bLoading = bLoading || ( specularData.first == ERequestTextureResult::Loading );
-
-		auto emissiveData = TextureLibrary::get()->getCombineTextureByName(emissiveTexture);
-		m_cacheGPUMaterialData.emissiveTexId = emissiveData.second.bindingIndex;
-		bLoading = bLoading || ( emissiveData.first == ERequestTextureResult::Loading );
-
-		bSomeTextureLoading = bLoading;
-	}
-
-	return m_cacheGPUMaterialData;
-}

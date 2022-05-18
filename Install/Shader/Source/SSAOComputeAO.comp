@@ -1,0 +1,134 @@
+#version 460
+
+#define LOCAL_SIZE_XY 16
+layout (local_size_x = LOCAL_SIZE_XY, local_size_y = LOCAL_SIZE_XY, local_size_z = 1) in;
+
+#include "SSAOCommon.glsl"
+
+// out GTAOImage.
+void main()
+{
+    ivec2 pixelPos = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 workSize = imageSize(GTAOImage);
+
+    // fallback fill.
+    imageStore(GTAOImage, pixelPos, vec4(1.0));
+    if(pixelPos.x >= workSize.x || pixelPos.y >= workSize.y)
+    {
+        return;
+    }
+
+    vec2 texelSize = 1.0f / vec2(workSize);
+
+    
+    vec2 uv        = (vec2(pixelPos) + vec2(0.5)) * texelSize; 
+
+    vec4 gbufferB = texture(inGBufferB, uv);
+    if(matchShadingModel(gbufferB.w, SHADING_MODEL_UNVALID))
+    {
+        return;
+    }
+    
+    const vec3 viewPos    = GTAOGetViewPosition(uv);
+	const vec3 viewNormal = GTAOGetViewNormal(uv);
+	const vec3 viewDir    = normalize(-viewPos);
+
+    const int directionNum = kGTAODirectionNum;
+    const int stepNum = kGTAOStepNum;
+
+    
+
+    float radiusScale = workSize.y / (tan(viewData.camInfo.x * 0.5f) * 2) * 0.5f;
+
+    // GTAO step radius.
+    const float linearZ = -viewPos.b; // vulkan viewspace z is equal to -linearZ.
+    float stepRadius = max(min((kGTAORadius * radiusScale) / linearZ, 512.0f), float(stepNum));
+
+    // See Activision GTAO paper: https://www.activision.com/cdn/research/s2016_pbs_activision_occlusion.pptx
+    // Divide by steps + 1 so that the farthest samples are not fully attenuated
+    stepRadius /= float(stepNum + 1);
+
+    float jitterStepOffset = fract(GTAOOffsets(pixelPos) + kGTAOOffsets[(frameData.frameIndex.x) % 4]);
+	float jitterRotateDirection = GTAONoise(pixelPos) + kGTAORotations[frameData.frameIndex.x % 6];
+    
+    float occlusion = 0.0f;
+    
+    float angle;
+    float bentAngle;
+    float wallDarkeningCorrection;
+    float sliceLength;
+    float n;
+    float cosN;
+
+	vec2 h, H, falloff, uvOffset, h1h2, h1h2Length;
+
+	vec3 sliceDir, h1, h2, planeNormal, planeTangent, sliceNormal;
+
+    vec3 bentNormal = vec3(0.0f, 0.0f, 0.0f);
+	vec4 uvSlice;
+
+    float thickness = kGTAOThickness;
+
+    for (int i = 0; i < directionNum; i++)
+	{
+		angle = (i + jitterRotateDirection) * (kPI / float(directionNum));
+		sliceDir = vec3(vec2(cos(angle), sin(angle)), 0);
+
+		planeNormal = normalize(cross(sliceDir, viewDir));
+		planeTangent = cross(viewDir, planeNormal);
+		sliceNormal = viewNormal - planeNormal * dot(viewNormal, planeNormal);
+		sliceLength = length(sliceNormal);
+
+		cosN = clamp(dot(normalize(sliceNormal), viewDir), -1, 1);
+		n = -sign(dot(sliceNormal, planeTangent)) * acos(cosN);
+		h = vec2(-1.0f, -1.0f);
+
+		for (int j = 0; j < stepNum; j++)
+		{
+			uvOffset = (sliceDir.xy * texelSize) * max(stepRadius * (j + jitterStepOffset ), 1 + j) * vec2(1.0f, -1.0f);
+			uvSlice = uv.xyxy + vec4(uvOffset.xy, -uvOffset.xy);
+
+			h1 = GTAOGetViewPosition(uvSlice.xy) - viewPos;
+			h2 = GTAOGetViewPosition(uvSlice.zw) - viewPos;
+
+			h1h2 = vec2(dot(h1, h1), dot(h2, h2));
+			h1h2Length = inversesqrt(h1h2);
+
+			falloff = clamp(h1h2 * (2 / max(kGTAORadius * kGTAORadius, 0.001f)), vec2(0), vec2(1));
+
+			H = vec2(dot(h1, viewDir), dot(h2, viewDir)) * h1h2Length;
+            
+			h.x = (H.x > h.x) ? mix(H.x, h.x, falloff.x) : mix(H.x, h.x, thickness);
+            h.y = (H.y > h.y) ? mix(H.y, h.y, falloff.y) : mix(H.y, h.y, thickness);
+		}	
+
+		h = acos(clamp(h, -1, 1));
+		h.x = n + max(-h.x - n, -kPIHalf);
+		h.y = n + min( h.y - n,  kPIHalf);
+
+		bentAngle = (h.x + h.y) * 0.5;
+		bentNormal += (viewDir * cos(bentAngle) - planeTangent * sin(bentAngle));
+
+		occlusion += sliceLength * GTAOIntegrateArcCosWeight(h, n);
+	}
+
+	bentNormal = normalize(normalize(bentNormal) - viewDir * 0.5);
+	occlusion = clamp(pow(occlusion / float(directionNum), kGTAOPower), 0, 1);
+
+    float reflectionOcclusion;
+    {
+        vec3 worldBentNormal = normalize((viewData.camViewInverse * vec4(bentNormal, 0.0f)).rgb);
+        vec3 worldNormal = gbufferB.rgb;
+        float roughness = texture(inGBufferS, uv).g;
+
+        vec3 worldPos = GTAOGetWorldPosition(uv);
+
+        vec3 viewDir = normalize(worldPos - viewData.camWorldPos.xyz);
+	    vec3 reflectionDir = reflect(viewDir, worldNormal);
+
+        reflectionOcclusion  = GTROReflectionOcclusion(worldBentNormal, reflectionDir, roughness, mix(1.0f, occlusion, kGTROIntensity));
+        reflectionOcclusion *= reflectionOcclusion;
+    }
+    
+    imageStore(GTAOImage, pixelPos, vec4(vec2(occlusion, reflectionOcclusion), 1.0f, 1.0f));
+}

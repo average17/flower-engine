@@ -1,52 +1,43 @@
-#include "engine.h"
-#include "core/timer.h"
-#include "core/runtime_module.h"
-#include "renderer/renderer.h"
-#include "asset_system/asset_system.h"
-#include "scene/scene.h"
-#include "core/job_system.h"
-#include "shader_compiler/shader_compiler.h"
+#include "Engine.h"
+#include "Core/Core.h"
 
-namespace engine{
+namespace flower {
 
-bool Engine::init()
-{
-	jobsystem::initialize();
+	Engine GEngine = {};
 
-	m_moduleManager = std::make_unique<ModuleManager>();
-	m_moduleManager->m_engine = this;
+	bool Engine::beforeInit()
+	{
+		CHECK(m_moduleManager == nullptr);
 
-	// 注册模块
-	// NOTE: 注册顺序决定Tick调用次序和析构释放次序
-	//       不要轻易调整它们的顺序
-	m_moduleManager->registerRuntimeModule<asset_system::AssetSystem>(ETickType::True);
-	m_moduleManager->registerRuntimeModule<shaderCompiler::ShaderCompiler>(ETickType::True);
-	m_moduleManager->registerRuntimeModule<SceneManager>(ETickType::Smoothed);
-	m_moduleManager->registerRuntimeModule<Renderer>(ETickType::True);
+		m_moduleManager = std::make_unique<ModuleManager>();
+		m_moduleManager->m_engine = this;
 
-	// 初始化所有的模块
-	m_moduleManager->init();
+		return true;
+	}
 
-	return true;
-}
+	bool Engine::init()
+	{
+		CHECK(m_moduleManager);
 
-Engine::~Engine()
-{
-	m_moduleManager.reset();
-	jobsystem::destroy();
-}
+		m_moduleManager->init();
 
-ETickResult Engine::tick(float trueDt,float smoothDt)
-{
-	m_moduleManager->tick(ETickType::True,     trueDt);
-	m_moduleManager->tick(ETickType::Smoothed, smoothDt);
+		m_bInit = true;
+		return true;
+	}
 
-	return ETickResult::Continue;
-}
+	Engine::~Engine()
+	{
+		m_moduleManager.reset();
+	}
 
-void Engine::release()
-{
-	m_moduleManager->release();
-}
+	bool Engine::tick(const TickData& tickData)
+	{
+		m_moduleManager->tick(tickData);
+		return true;
+	}
 
+	void Engine::release()
+	{
+		m_moduleManager->release();
+	}
 }

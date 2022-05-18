@@ -1,0 +1,114 @@
+#version 460
+
+layout (local_size_x = 256) in;
+
+#include "Common.glsl"
+
+#define FRAME_DATA_SET 0
+#include "FrameData.glsl"
+
+#define VIEW_DATA_SET 1
+#include "ViewData.glsl"
+
+#include "SDSMCommon.glsl"
+
+layout (set = 2, binding = 0)  readonly buffer PerObjectBuffer
+{
+	PerObjectData objectDatas[];
+};
+
+// all cascade buffer.
+layout (set = 3, binding = 0) writeonly buffer IndirectDraws
+{
+	IndexedIndirectCommand indirectDraws[];
+};
+
+layout (set = 4, binding = 0) writeonly buffer IndirectDrawCountBuffer
+{
+	IndirectDrawCount outDrawCount[];
+};
+
+layout (set = 5, binding = 0) readonly buffer inCascadeBuffer
+{
+	CascadeInfo cascadeInfos[];
+};
+
+struct CullingPushConstants
+{
+	uint count;
+    uint cascadeCount;
+};	
+
+layout(push_constant) uniform constants
+{   
+   CullingPushConstants cullData;
+};
+
+void visibileCulling(uint id, uint cascadeId)
+{
+	PerObjectData objectData = objectDatas[id];
+
+	vec3 localPos = objectData.sphereBounds.xyz;
+	vec4 worldPos = objectData.modelMatrix * vec4(localPos, 1.0f);
+
+	// local to world normal matrix.
+	mat3 normalMatrix = transpose(inverse(mat3(objectData.modelMatrix)));
+	mat3 world2Local = inverse(normalMatrix);
+
+	bool bVisibile = true;
+
+	// frustum test.
+	for (int i = 0; i < 4; i++)  // frustum 4, 5 is back and front face, don't test.
+	{
+        vec3 worldSpaceN = cascadeInfos[cascadeId].frustumPlanes[i].xyz;
+        float castDistance = dot(worldPos.xyz, worldSpaceN);
+
+		// transfer to local matrix and use abs get first dimensions project value,
+		// use that for test.
+		vec3 localNormal = world2Local * worldSpaceN;
+		float absDiff = dot(abs(localNormal), objectData.extents.xyz);
+		if (castDistance + absDiff + cascadeInfos[cascadeId].frustumPlanes[i].w < 0.0)
+		{
+			bVisibile = false;
+		}
+	}
+
+	// Sotre in buffer if visible
+	if(bVisibile)
+	{
+		uint index = atomicAdd(outDrawCount[cascadeId].count, 1);
+		uint offsetBasic = cascadeId * MAX_SSBO_OBJECTS;
+		uint validId = offsetBasic + index;
+
+		indirectDraws[validId].objectId      = id;
+		indirectDraws[validId].indexCount    = objectData.indexCount;
+		indirectDraws[validId].firstIndex    = objectData.firstIndex;
+		indirectDraws[validId].vertexOffset  = objectData.vertexOffset;
+		indirectDraws[validId].firstInstance = objectData.firstInstance;
+		indirectDraws[validId].instanceCount = 1;
+	}
+}
+
+layout (local_size_x = 256) in;
+
+// current just fill buffer draw.
+void main()
+{
+    uint idx = gl_GlobalInvocationID.x;
+	if (idx < cullData.cascadeCount)
+	{
+		// set to zero.
+		atomicExchange(outDrawCount[idx].count, 0);
+	}
+
+	groupMemoryBarrier();
+    barrier();
+
+	if(idx < cullData.count * cullData.cascadeCount)
+	{
+		uint cascadeIndex = idx / cullData.count;
+		uint trueId = idx % cullData.count;
+
+		visibileCulling(trueId, cascadeIndex);
+	}
+}

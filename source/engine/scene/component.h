@@ -1,79 +1,36 @@
 #pragma once
 #include <string>
-#include <cereal/access.hpp>
-#include <cereal/types/memory.hpp>
-#include <cereal/types/string.hpp>
-#include <cereal/types/vector.hpp>
-#include <cereal/cereal.hpp> 
-#include <cereal/types/unordered_map.hpp>
-#include <cereal/types/list.hpp>
-#include <cereal/types/polymorphic.hpp>
-#include <cereal/archives/binary.hpp>
-#include <cereal/archives/xml.hpp>
-#include <cereal/archives/json.hpp>
-#include <cereal/types/base_class.hpp>
-#include "../core/core.h"
+#include <memory>
+#include "../Core/Core.h"
 
-namespace engine{
-
-namespace EComponentType
+namespace flower
 {
-	constexpr int32_t Transform           = 0;
-	constexpr int32_t StaticMeshComponent = 1;
-	constexpr int32_t SceneViewCamera     = 2;
-	constexpr int32_t DirectionalLight    = 3;
-	constexpr int32_t PMXMeshComponent    = 4;
-}
+	class SceneNode;
 
-template<typename T>
-inline size_t getTypeId()
-{
-	return -1;
-}
+	#define COMPONENT_NAME_OVERRIDE(T) \
+		inline const char* getComponentClassName() const { return getTypeName<T>(); } \
+		static const char* getComponentStaticName()      { return getTypeName<T>(); } 
 
-class Component
-{
-	friend class Scene;
-private:
-	std::string m_name = "Component";
-
-private:
-	friend class cereal::access;
-
-	template <class Archive>
-	void serialize(Archive& ar)
+	class Component
 	{
-		ar(cereal::make_nvp("Component", m_name));
-	}
+	protected:
+		// reference of the owner node.
+		std::weak_ptr<SceneNode> m_node;
 
-public:
-	Component() = default;
-	virtual ~Component() = default;
+	public:
+		Component() = default;
+		virtual ~Component();
 
-	Component(const std::string& name)
-		: m_name(name)
+		void setNode(std::weak_ptr<SceneNode> node) { m_node = node; }
+		std::shared_ptr<SceneNode> getNode() { return m_node.lock(); }
+
+		COMPONENT_NAME_OVERRIDE(Component);
+	};
+
+	template<typename T>
+	inline void COMPONENT_TYPE_CHECK()
 	{
-
+		// static_assert(T::getComponentStaticName() != Component::getComponentStaticName());
+		CHECK(T::getComponentStaticName() != Component::getComponentStaticName() && "Don't use componet base class.");
 	}
-
-	Component(std::string&& name)
-		: m_name(std::move(name))
-	{
-
-	}
-
-	Component (Component&& other)
-		: m_name(other.m_name) 
-	{
-
-	}
-
-	const auto& getName() const
-	{
-		return m_name;
-	}
-
-	virtual size_t getType() = 0;
-};
-
 }

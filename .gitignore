@@ -1,6 +1,4 @@
 .vs/
-binary/
-install/project/
-install/log/
-art/
-cache/
+Install/Log/
+Build/
+Art/

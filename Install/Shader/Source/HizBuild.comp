@@ -1,0 +1,90 @@
+#version 460
+
+struct PushConstants
+{
+    uvec4 dimXY; // .xy is width and depth, .zw is preWidth and preHeight.
+    int buildIndex;
+};
+
+layout(push_constant) uniform constants
+{   
+    PushConstants pushConstant;
+};
+
+layout (constant_id = 0) const int NumMipLevels = 1;
+
+// hiz, .x is min z, .y is max z.
+// store hiz.
+layout (set = 0, binding = 0, rg32f) uniform writeonly image2D hizImage[NumMipLevels];
+
+// sampler depth.
+// point clamp sampler
+layout (set = 0, binding = 1) uniform sampler2D inDepth; 
+
+// sampler hiz.
+// point clamp sampler
+layout (set = 0, binding = 2) uniform sampler2D inHiz;
+
+// no so fast, maybe i should try some process like AMD SPD.
+layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+void main()
+{
+    // border check.
+    if(gl_GlobalInvocationID.x >= pushConstant.dimXY.x || gl_GlobalInvocationID.y >= pushConstant.dimXY.y)
+    {
+        return;
+    }
+
+    float minZ = 1.0f;
+    float maxZ = 0.0f;
+    if(pushConstant.buildIndex == 0)
+    {
+        float z = texelFetch(inDepth, ivec2(gl_GlobalInvocationID.xy), 0).x;
+        minZ = z;
+        maxZ = z;
+    }
+    else
+    {
+        ivec2 samplePos = ivec2(gl_GlobalInvocationID.xy) * 2;
+        bvec2 bPrevLevelIsOdd = bvec2((pushConstant.dimXY.z & 1) != 0, (pushConstant.dimXY.w & 1) != 0);
+        ivec2 offsets[4] = 
+        { 
+            ivec2(0, 1), ivec2(1, 1), 
+            ivec2(0, 0), ivec2(1, 0)
+        };
+
+        vec2 z0 = texelFetch(inHiz, samplePos + offsets[0], pushConstant.buildIndex - 1).xy;
+        vec2 z1 = texelFetch(inHiz, samplePos + offsets[1], pushConstant.buildIndex - 1).xy;
+        vec2 z2 = texelFetch(inHiz, samplePos + offsets[2], pushConstant.buildIndex - 1).xy;
+        vec2 z3 = texelFetch(inHiz, samplePos + offsets[3], pushConstant.buildIndex - 1).xy;
+
+        minZ = min(min(min(z0.x, z1.x), z2.x), z3.x);
+        maxZ = max(max(max(z0.y, z1.y), z2.y), z3.y);
+
+        if(bPrevLevelIsOdd.x)
+        {
+            vec2 z4 = texelFetch(inHiz, samplePos + ivec2(2, 0), pushConstant.buildIndex - 1).xy;
+            vec2 z5 = texelFetch(inHiz, samplePos + ivec2(2, 1), pushConstant.buildIndex - 1).xy;
+            minZ = min(min(minZ, z4.x), z5.x);
+            maxZ = max(max(maxZ, z4.y), z5.y);
+        }
+
+        if(bPrevLevelIsOdd.y)
+        {
+            vec2 z4 = texelFetch(inHiz, samplePos + ivec2(0, 2), pushConstant.buildIndex - 1).xy;
+            vec2 z5 = texelFetch(inHiz, samplePos + ivec2(1, 2), pushConstant.buildIndex - 1).xy;
+            minZ = min(min(minZ, z4.x), z5.x);
+            maxZ = max(max(maxZ, z4.y), z5.y);
+        }
+
+        if(bPrevLevelIsOdd.x && bPrevLevelIsOdd.y)
+        {
+            vec2 z6 = texelFetch(inHiz, samplePos + ivec2(2, 2), pushConstant.buildIndex - 1).xy;
+
+            minZ = min(minZ, z6.x);
+            maxZ = max(maxZ, z6.y);
+        }
+    }
+
+    imageStore(hizImage[pushConstant.buildIndex], ivec2(gl_GlobalInvocationID.xy), vec4(minZ, maxZ, 0.0f, 0.0f));
+}

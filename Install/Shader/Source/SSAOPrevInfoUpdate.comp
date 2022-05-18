@@ -1,0 +1,17 @@
+#version 460
+
+#include "SSAOCommon.glsl"
+
+// Temp In, Temporal Out.
+layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+void main()
+{
+    ivec2 pixelPos = ivec2(gl_GlobalInvocationID.xy);
+    {
+        ivec2 size = imageSize(GTAOTemporal);
+        if(pixelPos.x < size.x && pixelPos.y < size.y)
+        {
+            imageStore(GTAOTemporal, ivec2(gl_GlobalInvocationID.xy), texelFetch(inGTAOTempFilter, pixelPos, 0));
+        }
+    }
+}

@@ -1,0 +1,114 @@
+#version 460
+
+#include "SSRCommon.glsl"
+#include "BRDF.glsl"
+
+float SSRBRDF(vec3 V, vec3 L, vec3 N, float Roughness)
+{
+	vec3 H = normalize(L + V);
+
+	float NoH = max(dot(N, H), 0);
+	float NoL = max(dot(N, L), 0);
+	float NoV = max(dot(N, V), 0);
+
+    float a = Roughness * Roughness;
+    float a2 = a * a;
+
+	float D = D_GGX(NoH, a2);
+	float G = VisSmithGGXCorrelated(NoL, NoV, Roughness);
+
+	return max(0, D * G);
+}
+
+void Resolve()
+{
+    // border check.
+    imageStore(SSRReflection, ivec2(gl_GlobalInvocationID.xy), vec4(0));
+    if(gl_GlobalInvocationID.x >= pushConstant.dimXY.x || gl_GlobalInvocationID.y >= pushConstant.dimXY.y)
+    {
+        return;
+    }
+
+    vec2 uv = (vec2(gl_GlobalInvocationID.xy) + vec2(0.5f)) / vec2(pushConstant.dimXY);
+    ivec2 pixelPos = ivec2(gl_GlobalInvocationID.xy);
+
+    vec4 gbufferB = texelFetch(inGBufferB, pixelPos, 0);
+    vec4 gbufferS = texelFetch(inGBufferS, pixelPos, 0);
+
+    // skip sky background.
+    float shadingModel = gbufferB.w;
+    if(!matchShadingModel(shadingModel, SHADING_MODEL_DisneyBRDF)) return;
+    
+    float roughness = gbufferS.g;
+    if(roughness > pushConstant.maxRoughness) return;
+
+    float z = textureLod(inHiz, uv, 0).r;
+    mat4 inverseProject = viewData.camProjJitterInverse;
+
+    vec3 screenSpacePos = vec3(uv, z);
+
+    vec3 viewSpacePos = SSRInvProjectPosition(screenSpacePos, inverseProject);
+    vec3 viewSpaceNormal = (viewData.camView * vec4(gbufferB.rgb, 0.0f)).xyz;
+
+    float numWeight = 0.0f;
+    vec4 reflectionColor = vec4(0);
+
+    uint numResolve = 4;
+    vec2 texelSize = 1.0f / vec2(pushConstant.dimXY);
+
+    // expand resolve sample radius by roughness.
+    // cause cache miss on very glossy surface.
+    float expandSize = clamp(roughness * 5.0f, 0.0f, 1.0f);
+    expandSize = mix(2.0f, 8.0f, expandSize);
+
+    const uvec2 random = Rand3DPCG16(ivec3(pixelPos.xy, frameData.frameIndex.x)).xy;
+
+    for (int i = 0; i < numResolve; i++)
+	{
+        vec2 randomData = Hammersley16(i, numResolve, random) - 0.5f;
+
+		vec2 offsetUV = getBlueNoiseRandom16Spp(pixelPos, i);
+        offsetUV *= expandSize * texelSize;
+
+        vec2 neighborUV = uv + offsetUV;
+
+        vec4 hitUVPDF = texture(inSSRIntersect, neighborUV);
+        vec3 hitViewPos = SSRInvProjectPosition(hitUVPDF.xyz, inverseProject);
+
+        float weight = SSRBRDF(
+            normalize(-viewSpacePos), 
+            normalize(hitViewPos - viewSpacePos), 
+            viewSpaceNormal, 
+            roughness)
+        / max(1e-5, hitUVPDF.a);
+
+        vec4 sampleColor = vec4(0);
+
+        // tiny velocity compensate, no so accurate.
+        vec2 velocity = getMotionVector(hitUVPDF.z, hitUVPDF.xy);
+        sampleColor.rgb = texture(inSceneColor, hitUVPDF.xy - velocity).rgb;
+
+        sampleColor.rgb /= 1 + luminance(sampleColor.rgb);
+
+        // mask
+        sampleColor.a = texture(inSSRHitMask, neighborUV).r;
+
+        reflectionColor += sampleColor * weight;
+        numWeight += weight;
+	}
+
+    if(numWeight > 0.0f)
+    {
+        reflectionColor /= numWeight;
+	    reflectionColor.rgb /= 1 - luminance(reflectionColor.rgb);
+	    reflectionColor = max(vec4(1e-5), reflectionColor);
+    }
+
+    imageStore(SSRReflection, ivec2(gl_GlobalInvocationID.xy), reflectionColor);
+}
+
+layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+void main()
+{
+    Resolve();
+}

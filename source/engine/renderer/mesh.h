@@ -1,165 +1,89 @@
 #pragma once
-#include "../core/core.h"
-#include "../vk/vk_rhi.h"
-#include <unordered_set>
-namespace engine{
+#include <cstdint>
+#include "../RHI/Common.h"
+#include "../RHI/Buffer.h"
+#include "../Core/UUID.h"
 
-namespace asset_system
+namespace flower
 {
-    class AssetSystem;
-}
+	// standard index type.
+	using VertexIndexType = uint32_t;
 
-struct Material;
+	// keep same with RHI/Common.h EVertexAttribute
+	struct StandardVertex
+	{
+		glm::vec3 pos     = glm::vec3(0.0f);
+		glm::vec2 uv0     = glm::vec2(0.0f);
+		glm::vec3 normal  = glm::vec3(0.0f);
+		glm::vec4 tangent = glm::vec4(0.0f);
+	};
+	
+	// standard mesh attributes.
+	inline std::vector<EVertexAttribute> getStandardMeshAttributes()
+	{
+		return std::vector<EVertexAttribute>{
+			EVertexAttribute::pos,
+			EVertexAttribute::uv0,
+			EVertexAttribute::normal,
+			EVertexAttribute::tangent
+		};
+	}
 
-struct RenderBounds
-{
-    glm::vec3 origin; // 中心
-    glm::vec3 extents; // 角点
+	// standard mesh attributes vertex count.
+	inline constexpr uint32_t getStandardMeshAttributesVertexCount()
+	{
+		return 3 + 2 + 3 + 4;
+	}
 
-    float radius; // 包围球半径
+	// render bounds of submesh.
+	struct RenderBounds
+	{
+		glm::vec3 origin;
+		glm::vec3 extents;
 
-    static void toExtents(const RenderBounds& in,float& zmin,float& zmax,float& ymin,float& ymax,float& xmin,float& xmax,float scale = 1.5f);
-    static RenderBounds combine(const RenderBounds& b0,const RenderBounds& b1);
-};
+		float radius;
 
-struct SubMesh
-{
-    RenderBounds renderBounds;
+		static void toExtents(
+			const RenderBounds& in, 
+			float& zmin, 
+			float& zmax, 
+			float& ymin, 
+			float& ymax, 
+			float& xmin, 
+			float& xmax, 
+			float scale = 1.5f
+		);
+		
+		static RenderBounds combine(
+			const RenderBounds& b0, 
+			const RenderBounds& b1
+		);
+	};
 
-    uint32 indexStartPosition;
-    uint32 indexCount;
+	struct SubMesh
+	{
+		RenderBounds renderBounds = {};
 
-    Ref<Material> cacheMaterial = nullptr;
-    std::string materialInfoPath;
-};
+		uint32_t indexStartPosition = 0;
+		uint32_t indexCount = 0;
 
-struct RenderSubMesh
-{
-    RenderBounds renderBounds;
+		UUID material = UNVALID_UUID;
+	};
 
-    uint32 indexStartPosition;
-    uint32 indexCount;
+	struct Mesh
+	{
+		std::vector<SubMesh> subMeshes = {};
+		std::vector<EVertexAttribute> layout = {};
 
-    Ref<Material> cacheMaterial = nullptr;
-    bool bCullingResult = true;
+		uint32_t vertexStartPosition = 0;
+		uint32_t vertexCount = 0;
 
-    glm::mat4 modelMatrix;
-    glm::mat4 preModelMatrix;
-};
+		uint32_t indexStartPosition = 0;
+		uint32_t indexCount = 0;
 
-inline std::vector<EVertexAttribute> getStandardMeshAttributes()
-{
-    return std::vector<EVertexAttribute>{
-        EVertexAttribute::pos,
-        EVertexAttribute::uv0,
-        EVertexAttribute::normal,
-        EVertexAttribute::tangent
-    };
-}
+		bool bReady;
+		Mesh* fallBackMesh = nullptr;
 
-inline uint32 getStandardMeshAttributesVertexCount()
-{
-    return 3 + 2 + 3 + 4;
-}
-
-enum class EPrimitiveMesh
-{
-    Min = 0,
-
-    Box,
-    Custom,
-
-    Max,
-};
-
-inline std::string toString(EPrimitiveMesh type)
-{
-    switch(type)
-    {
-    case engine::EPrimitiveMesh::Box:
-        return "Box";
-    case engine::EPrimitiveMesh::Custom:
-        return "Custom";
-    }
-
-    LOG_FATAL("Unknow type!");
-    return "";
-}
-
-inline void loopPrimitiveType(std::function<void(std::string,EPrimitiveMesh)>&& lambda)
-{
-    size_t begin = size_t(EPrimitiveMesh::Min) + 1;
-    size_t end = size_t(EPrimitiveMesh::Max);
-
-    for(size_t i = begin; i<end; i++)
-    {
-        lambda(toString(EPrimitiveMesh(i)),EPrimitiveMesh(i));
-    }
-}
-
-struct Mesh
-{
-    std::vector<SubMesh> subMeshes;
-    std::vector<EVertexAttribute> layout;
-
-    uint32 vertexStartPosition;
-    uint32 vertexCount;
-
-    uint32 indexStartPosition;
-    uint32 indexCount;
-};
-
-struct RenderMeshPack
-{
-    std::vector<RenderSubMesh> submesh;
-};
-
-class MeshLibrary
-{
-    // TODO: 缓存Memory Allocation + Placement New的方式增加内存连续性
-    using MeshContainer = std::unordered_map<std::string,Mesh*>;
-    friend asset_system::AssetSystem;
-
-private:
-    static MeshLibrary* s_meshLibrary;
-
-    std::unordered_set<std::string> m_staticMeshList;
-    MeshContainer m_meshContainer;
-
-    // NOTE: 缓存了所有的网格顶点数据
-    //       当前的策略为一旦加载就不再释放直到引擎明确退出。
-    // TODO: 如果有需要时再换成流式加载
-    std::vector<VertexIndexType> m_cacheIndicesData = {};
-    std::vector<float> m_cacheVerticesData = {};
-
-    VulkanIndexBuffer* m_indexBuffer = nullptr;
-    VulkanVertexBuffer* m_vertexBuffer = nullptr;
-
-private:
-    void buildFromGameAsset(Mesh& inout,const std::string& gameName);
-
-private: // upload gpu
-    uint32 m_lastUploadVertexBufferPos = 0;
-    uint32 m_lastUploadIndexBufferPos = 0;
-
-    // 每帧Tick时在AssetSystem调用
-    void uploadAppendBuffer();
-
-public:
-    Mesh& getUnitBox();
-    Mesh& getMeshByName(const std::string& gameName);
-
-    void init();
-    void release();
-
-    static MeshLibrary* get() { return s_meshLibrary; }
-    void bindVertexBuffer(VkCommandBuffer cmd);
-    void bindIndexBuffer(VkCommandBuffer cmd);
-
-    const std::unordered_set<std::string>& getStaticMeshList() const;
-    void emplaceStaticeMeshList(const std::string& name);
-
-    bool MeshReady(const Mesh& in) const;
-};
-
+		Mesh* getValidRenderMesh();
+	};
 }

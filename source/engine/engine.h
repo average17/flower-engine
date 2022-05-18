@@ -1,36 +1,38 @@
 #pragma once
-#include "core/core.h"
-#include "core/runtime_module.h"
-#include <glfw/glfw3.h>
-#include "core/windowData.h"
-#include "core/timer.h"
 
-namespace engine{
+#include "Core/RuntimeModule.h"
 
-enum class ETickResult: uint8
-{
-	Continue,
-	End,
-};
+namespace flower {
 
-class Engine final : private NonCopyable
-{
-private:
-	std::unique_ptr<ModuleManager> m_moduleManager { nullptr };
-
-public:
-	Engine() = default;
-	~Engine();
-
-	template <typename T> 
-	Ref<T> getRuntimeModule() const
+	class Engine final : private NonCopyable
 	{
-		return m_moduleManager->getRuntimeModule<T>();
-	}
+	private:
+		bool m_bInit = false;
+		std::unique_ptr<ModuleManager> m_moduleManager{ nullptr };
+		
+	public:
+		Engine() = default;
+		~Engine();
 
-	bool init();
-	ETickResult tick(float trueDt,float smoothDt);
-	void release();
-};
+		template <typename T>
+		T* getRuntimeModule() const
+		{
+			return m_moduleManager->getRuntimeModule<T>();
+		}
 
+		template<typename T>
+		void registerRuntimeModule()
+		{
+			m_moduleManager->registerRuntimeModule<T>();
+		}
+
+		bool beforeInit();
+		bool init();
+		bool tick(const TickData& tickData);
+		void release();
+
+		bool isEngineInit() const { return m_bInit; }
+	};
+
+	extern Engine GEngine;
 }

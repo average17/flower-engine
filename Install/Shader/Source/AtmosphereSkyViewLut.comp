@@ -1,0 +1,53 @@
+#version 460
+
+#include "AtmosphereCommon.glsl"
+
+void main()
+{
+    vec2 fragCoord = vec2(gl_GlobalInvocationID.xy) + vec2(0.5f);
+    vec2 lutRes = vec2(imageSize(outSkyViewLut));
+
+    float u = fragCoord.x / lutRes.x;
+    float v = fragCoord.y / lutRes.y;
+
+    float azimuthAngle = (u - 0.5)*2.0*PI;
+
+    float adjV;
+    if (v < 0.5) 
+    {
+        float coord = 1.0 - 2.0*v;
+        adjV = -coord*coord;
+    }
+    else 
+    {
+        float coord = v * 2.0 - 1.0;
+        adjV = coord * coord;
+    }
+
+    vec3 camViewPos = getViewPos();
+    float height = length(camViewPos);
+
+    vec3 up = camViewPos / height;
+
+    float horizonAngle = safeacos(sqrt(height * height - pushConstant.groundRadiusMM * pushConstant.groundRadiusMM) / height) - 0.5*PI;
+    float altitudeAngle = adjV*0.5*PI - horizonAngle;
+
+    float cosAltitude = cos(altitudeAngle);
+    vec3 rayDir = vec3(cosAltitude*sin(azimuthAngle), sin(altitudeAngle), -cosAltitude*cos(azimuthAngle));
+
+    float sunAltitude = (0.5 * PI) - acos(dot(getSunDir(), up));
+
+    vec3 sunDir = vec3(0.0, sin(sunAltitude), -cos(sunAltitude));
+
+    float atmoDist = rayIntersectSphere(camViewPos, rayDir, pushConstant.atmosphereRadiusMM);
+    float groundDist = rayIntersectSphere(camViewPos, rayDir, pushConstant.groundRadiusMM);
+    float tMax = (groundDist < 0.0) ? atmoDist : groundDist;
+
+    vec3 ts;
+    vec3 lum = raymarchScattering(camViewPos, rayDir, sunDir, tMax, float(numScatteringSteps), ts);
+    lum *= frameData.directionalLightColor.xyz;
+
+    vec4 color = vec4(lum, 1.0);
+
+    imageStore(outSkyViewLut, ivec2(gl_GlobalInvocationID.xy), color);
+}

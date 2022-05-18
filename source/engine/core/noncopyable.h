@@ -1,16 +1,16 @@
 #pragma once
 
-namespace engine{
-
-class NonCopyable 
+namespace flower 
 {
-protected:
-    NonCopyable() = default;
-    ~NonCopyable() = default;
+    class NonCopyable
+    {
+    protected:
+        NonCopyable() = default;
+        ~NonCopyable() = default;
 
-private:
-    NonCopyable(const NonCopyable&) = delete;
-    const NonCopyable& operator=(const NonCopyable&) = delete;
-};
+    private:
+        NonCopyable(const NonCopyable&) = delete;
+        const NonCopyable& operator=(const NonCopyable&) = delete;
+    };
 
 }

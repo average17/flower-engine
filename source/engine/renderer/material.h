@@ -1,70 +1,45 @@
 #pragma once
+#include <cstdint>
+#include <optional>
 
-#include "../core/core.h"
-#include "../vk/vk_rhi.h"
-#include "frame_data.h"
-#include <cereal/access.hpp>
-#include <cereal/types/memory.hpp>
-#include <cereal/types/string.hpp>
-#include <cereal/types/vector.hpp>
-#include <cereal/cereal.hpp> 
-#include <cereal/types/unordered_map.hpp>
-#include <cereal/types/list.hpp>
-#include <cereal/types/polymorphic.hpp>
-#include <cereal/archives/binary.hpp>
-#include <cereal/archives/xml.hpp>
-#include <cereal/archives/json.hpp>
-#include <cereal/types/base_class.hpp>
-#include "../shader_compiler/shader_compiler.h"
-#include <utility>
-#include <cereal/types/utility.hpp>
-
-namespace engine{
-
-// NOTE: 2021/10/24 12:01
-//       引擎已经升级到了Bindless式架构
-//       不再在一个Renderpass中为多个网格使用多种Shader，而是一个Renderpass使用一个固定的Uber Shader
-struct Material
+namespace flower
 {
-	std::string baseColorTexture;
-	std::string normalTexture;
-	std::string specularTexture;
-	std::string emissiveTexture;
-
-	template <class Archive> void serialize(Archive& ar)
+	//!! ensure all shaing model id smaller than 100
+	enum class EShadingModel
 	{
-		ar( baseColorTexture
-		   ,normalTexture
-		   ,specularTexture
-		   ,emissiveTexture);
-	}
+		UNVALID = 0,
+		DisneyBRDF = 1,
+	};
 
-	GPUMaterialData getGPUMaterialData();
+	struct GPUMaterialData;
+	struct GBufferMaterial
+	{
+		static GBufferMaterial buildFallback();
 
-private:
-	bool bSomeTextureLoading = true;
-	GPUMaterialData m_cacheGPUMaterialData;
-};
+		EShadingModel shadingModel = EShadingModel::DisneyBRDF;
 
-class MaterialLibrary
-{
-private:
-	// TODO: 换成Memory Allocation + Placement New的做法
-	std::unordered_map<std::string/*file path*/,Material*> m_materialContainer;
-	static MaterialLibrary* s_materialLibrary;
-	Material m_callBackMaterial;
-	MaterialLibrary();
-	~MaterialLibrary();
+		union Param
+		{
+			struct
+			{
+				float cutoff;
 
-public:
-	std::unordered_map<std::string,Material*>& getContainer();
-	static MaterialLibrary* get();
+				uint32_t baseColorId;   
+				uint32_t baseColorSampler; 
 
-	bool existMaterial(const std::string& name);
-	Material* createEmptyMaterialAsset(const std::string& name);
-	Material* getMaterial(const std::string& name);
+				uint32_t normalTexId;   
+				uint32_t normalSampler;
 
-	Material& getCallbackMaterial();
-};
+				uint32_t specularTexId; 
+				uint32_t specularSampler;
+
+				uint32_t emissiveTexId; 
+				uint32_t emissiveSampler;
+			}DisneyBRDF;
+		} parameters;
+
+		GPUMaterialData toGPUMaterialData() const;
+	};
+
 
 }

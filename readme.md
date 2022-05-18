@@ -1,30 +1,43 @@
-NOTE: The repo code is old but still can work, current project is under refactoring, i will update repo when my job done.
+# Flower Engine Ver. 1
 
-you can also watch the video on youtube or bilibili:
+​	**Tip: don't clone the whole repro by git, there are too much bin file upload to history here, it's my mistake. just download the zip on github.com. save a lot of time.**
 
-https://www.youtube.com/watch?v=ciw8UOmaFaI
+​	Flower engine is a vulkan starter friendly render engine.
 
-https://www.bilibili.com/video/BV1FL4y147DN?share_source=copy_web
+​	Too keep simple, i delete some complex code like animate/serialization etc, and rewrite this version code, to keep engine code clean and easy to understand.
 
-2022/02/21 20:44 Dev Snapshot
+​	There is not too much warping, so every beginner can easy to find out how it work.
 
-refracting new ui.
-![](dev/Snipaste_2022-02-21_22-38-17.png)
+​	you can also watch the video on youtube or bilibili:
 
-![](dev/Snipaste_2022-02-07_21-56-08.png)
-![](dev/Snipaste_2022-02-07_22-00-27.png)
+​	https://www.youtube.com/watch?v=ciw8UOmaFaI
 
-# Vulkan Engine Develop Test.
+​	https://www.bilibili.com/video/BV1FL4y147DN?share_source=copy_web
 
-## Current Developing Feature
+![](Gallery/Snipaste_2022-02-07_21-56-08.png)
 
-- Gpu Driven Rendering Pipeline.
-- Bindless Material System.
-- PBS Shading System.
-- Gpu Dispatch Sample Distribution Shadow Maps.
-- Fast Downsample Guassian Blur Bloom.
-- TAA.
-- FXAA.
-- Light Shaft.
-- Precompute Atmosphere.
-- SSSS Skin.
+![](Gallery/Snipaste_2022-05-18_23-56-08.png)
+
+## Current Features
+
+1. Gpu dispatch mesh rendering pipeline.
+2. Async texture uploading pipeline.
+3. Physical-Based rendering and shading.
+4. Ground-True approximate ambient occlusion.
+5. Stochastic screen space reflection.
+6. Precompute atmosphere.
+7. Gpu dispatch sample-distribution cascade shadow map.
+8. Temporal super sampling.
+9. Postprocessing effects.
+
+## How to build
+
+​	Just download the project, all dependency here is ready.
+
+​	bistro asset can download here:
+
+​	and unzip data to **Install/Project/**
+
+​	Set editor as start project. then click play. 
+
+**NOTE: When first time run, engine need some time to bake raw media asset to engine bin asset, so need a long time baking. but next time open the engine, it work very fast.**

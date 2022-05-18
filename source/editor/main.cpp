@@ -1,10 +1,12 @@
-#include "editor.h"
+#include "Editor.h"
 
 int main()
 {
-	Editor editor;
-	editor.init();
-	editor.loop();
-	editor.release();
+	Editor::init();
+
+	Editor::loop();
+
+	Editor::release();
+
 	return 0;
 }

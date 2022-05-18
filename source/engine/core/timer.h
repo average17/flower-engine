@@ -1,137 +1,135 @@
 #pragma once
 #include <chrono>
-#include "runtime_module.h"
 
-namespace engine{
-
-class Timer
+namespace flower
 {
-    friend class EngineLoop;
-private:
-    // 初始化的TimePoint,用于计算真实世界的时间流逝。
-    std::chrono::system_clock::time_point mInitTimePoint{ };
-    std::chrono::duration<float> mDeltaTime { 0.0f };
-
-    // 游戏中的TimePoint,用于计算游戏中的时间流逝。
-    std::chrono::system_clock::time_point mGameTimePoint{ };
-    std::chrono::duration<float> mGameDeltaTime { 0.0f };
-
-    // 游戏中的FramePoint,用于计算游戏中的DeltaTime。
-    std::chrono::system_clock::time_point mFrameTimePoint{ };
-    std::chrono::duration<float> mFrameDeltaTime { 0.0f };
-
-    bool bGamePause = true;
-    float m_currentFps {0.0f};
-    float m_currentSmoothFps {0.0f};
-
-    uint64 m_frameCount = 0;
-
-public:
-    float getCurrentFps() const { return m_currentFps;}
-    float getCurrentSmoothFps() const { return m_currentSmoothFps;}
-
-    Timer(){ }
-    ~Timer() { }
-
-    void globalTimeInit()
+    class Timer
     {
-        mInitTimePoint = std::chrono::system_clock::now();
-    }
+        friend class Launcher;
+    private:
+        std::chrono::system_clock::time_point m_initTimePoint{ };
+        std::chrono::duration<float> m_deltaTime { 0.0f };
 
-    float globalPassTime()
-    {
-        mDeltaTime = std::chrono::system_clock::now() - mInitTimePoint;
-        return mDeltaTime.count();
-    }
+        std::chrono::system_clock::time_point m_gameTimePoint{ };
+        std::chrono::duration<float> m_gameDeltaTime { 0.0f };
 
-    bool isGamePause() const
-    {
-        return bGamePause;
-    }
+        std::chrono::system_clock::time_point m_frameTimePoint{ };
+        std::chrono::duration<float> m_frameDeltaTime { 0.0f };
 
-    void gameStart()
-    {
-        mGameTimePoint = std::chrono::system_clock::now();
-        mGameDeltaTime = std::chrono::duration<float>(0.0f);
-        bGamePause = false;
-    }
+        uint64_t m_frameCount = 0;
 
-    auto getFrameCount() const
-    {
-        return m_frameCount;
-    }
+        bool  m_bGamePause = true;
+        float m_currentFps {0.0f};
+        float m_currentSmoothFps { 0.0f };
 
-    void frameCountAdd()
-    {
-        m_frameCount++;
-    }
+    public:
+        float getCurrentFps() const { return m_currentFps;}
+        float getCurrentSmoothFps() const { return m_currentSmoothFps;}
 
-    float gameTime()
-    {
-        if(bGamePause)
+        void setCurrentFps(float fps) { m_currentFps = fps; }
+        void setCurrentSmoothFps(float fps) { m_currentSmoothFps = fps; }
+
+        Timer(){ }
+        ~Timer() { }
+
+        void globalTimeInit()
         {
-            return mGameDeltaTime.count();
+            m_initTimePoint = std::chrono::system_clock::now();
         }
-        else
+
+        float globalPassTime()
         {
-            auto nowTime = std::chrono::system_clock::now();
-            mGameDeltaTime += nowTime - mGameTimePoint;
-            mGameTimePoint = nowTime;
-
-            return mGameDeltaTime.count();
+            m_deltaTime = std::chrono::system_clock::now() - m_initTimePoint;
+            return m_deltaTime.count();
         }
-    }
 
-    void gamePause()
-    {
-        if(!bGamePause)
+        bool isGamePause() const
         {
-            auto nowTime = std::chrono::system_clock::now();
-            mGameDeltaTime += nowTime - mGameTimePoint;
-
-            mGameTimePoint = nowTime;
-            bGamePause = true;
+            return m_bGamePause;
         }
-    }
 
-    void gameContinue()
-    {
-        if(bGamePause)
+        void gameStart()
         {
-            mGameTimePoint = std::chrono::system_clock::now();
-            bGamePause = false;
+            m_gameTimePoint = std::chrono::system_clock::now();
+            m_gameDeltaTime = std::chrono::duration<float>(0.0f);
+            m_bGamePause = false;
         }
-    }
 
-    void gameStop()
-    {
-        mGameTimePoint = std::chrono::system_clock::now();
-        mGameDeltaTime = std::chrono::duration<float>(0.0f);
+        auto getFrameCount() const
+        {
+            return m_frameCount;
+        }
 
-        bGamePause = true;
-    }
+        void frameCountAdd()
+        {
+            m_frameCount++;
+        }
 
-    void frameTimeInit()
-    {
-        mFrameTimePoint = std::chrono::system_clock::now();
-    }
+        float gameTime()
+        {
+            if(m_bGamePause)
+            {
+                return m_gameDeltaTime.count();
+            }
+            else
+            {
+                auto nowTime = std::chrono::system_clock::now();
+                m_gameDeltaTime += nowTime - m_gameTimePoint;
+                m_gameTimePoint = nowTime;
 
-    void frameTick()
-    {
-        mFrameDeltaTime = std::chrono::system_clock::now() - mFrameTimePoint;
-    }
+                return m_gameDeltaTime.count();
+            }
+        }
 
-    float frameDeltaTime() const
-    {
-        return mFrameDeltaTime.count();
-    }
+        void gamePause()
+        {
+            if(!m_bGamePause)
+            {
+                auto nowTime = std::chrono::system_clock::now();
+                m_gameDeltaTime += nowTime - m_gameTimePoint;
 
-    void frameReset()
-    {
-        mFrameTimePoint = std::chrono::system_clock::now();
-    }
-};
+                m_gameTimePoint = nowTime;
+                m_bGamePause = true;
+            }
+        }
 
-extern Timer g_timer;
+        void gameContinue()
+        {
+            if(m_bGamePause)
+            {
+                m_gameTimePoint = std::chrono::system_clock::now();
+                m_bGamePause = false;
+            }
+        }
 
+        void gameStop()
+        {
+            m_gameTimePoint = std::chrono::system_clock::now();
+            m_gameDeltaTime = std::chrono::duration<float>(0.0f);
+
+            m_bGamePause = true;
+        }
+
+        void frameTimeInit()
+        {
+            m_frameTimePoint = std::chrono::system_clock::now();
+        }
+
+        void frameTick()
+        {
+            m_frameDeltaTime = std::chrono::system_clock::now() - m_frameTimePoint;
+        }
+
+        float frameDeltaTime() const
+        {
+            return m_frameDeltaTime.count();
+        }
+
+        void frameReset()
+        {
+            m_frameTimePoint = std::chrono::system_clock::now();
+        }
+    };
+
+    extern Timer GTimer;
 }
