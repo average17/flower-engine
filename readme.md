@@ -1,7 +1,5 @@
 # Flower Engine Ver. 1
 
-​	**Tip: don't clone the whole repro by git, there are too much bin file upload to history here, it's my mistake. just download the zip on github.com. save a lot of time.**
-
 ​	Flower engine is a vulkan starter friendly render engine.
 
 ​	Too keep simple, i delete some complex code like animate/serialization etc, and rewrite this version code, to keep engine code clean and easy to understand.
