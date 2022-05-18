@@ -32,7 +32,7 @@
 
 ​	Just download the project, all dependency here is ready.
 
-​	bistro asset can download here:
+​	bistro asset can download here: https://drive.google.com/file/d/14dXqpqvnRHF8gRtfPVgDACDAH1UQmXni/view?usp=sharing
 
 ​	and unzip data to **Install/Project/**
 
