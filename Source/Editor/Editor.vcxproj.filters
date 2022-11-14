@@ -15,129 +15,123 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Editor.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\WidgetInterface.cpp">
+    <ClCompile Include="Pch.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\DockSpace\DockSpace.cpp">
+    <ClCompile Include="Widgets\Console.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\DockSpace\Menu.cpp">
+    <ClCompile Include="Widgets\Dockspace.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\Asset\WigetAsset.cpp">
+    <ClCompile Include="Widgets\Downbar.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\Asset\ContentView.cpp">
+    <ClCompile Include="Widgets\MainMenu.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\Asset\ContentViewItem.cpp">
+    <ClCompile Include="Widgets\Viewport.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\Asset\ContentTreeItem.cpp">
+    <ClCompile Include="Editor.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\Asset\Common.cpp">
+    <ClCompile Include="Widgets\SceneOutliner.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\Hierarchy\WidgetHierarchy.cpp">
+    <ClCompile Include="Widgets\Detail.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\Viewport\WidgetViewport.cpp">
+    <ClCompile Include="Widgets\ProjectSelect.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Style\Icon.cpp">
+    <ClCompile Include="Widgets\Widget.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\Console\WidgetConsole.cpp">
+    <ClCompile Include="Widgets\ContentViewer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\Console\Console.cpp">
+    <ClCompile Include="EditorAsset.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\Downbar\Downbar.cpp">
+    <ClCompile Include="Widgets\DrawComponent.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\Inspector\WidgetInspector.cpp">
+    <ClCompile Include="Widgets\ViewportCamera.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\Inspector\Components\InspectTransform.cpp">
+    <ClCompile Include="Widgets\DrawComponentStaticMesh.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\WidgetCommon.cpp">
+    <ClCompile Include="Widgets\DrawComponentDirectionalLight.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\Inspector\Components\InspectDirectionalLight.cpp">
+    <ClCompile Include="Widgets\DrawComponentSpotLight.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\Inspector\Components\InspectStaticMesh.cpp">
+    <ClCompile Include="Widgets\DrawComponentLight.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Widget\Inspector\Components\InspectAtmosphereSky.cpp">
+    <ClCompile Include="Widgets\RenderSetting.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Widgets\DrawComponentPMX.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Pch.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Widgets\Console.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Widgets\Dockspace.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Widgets\Downbar.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Widgets\MainMenu.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Widgets\Viewport.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Widgets\WidgetsHeader.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
     <ClInclude Include="Editor.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Widget\WidgetInterface.h">
+    <ClInclude Include="Widgets\SceneOutliner.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Widget\DockSpace\DockSpace.h">
+    <ClInclude Include="Widgets\Detail.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Widget\DockSpace\Menu.h">
+    <ClInclude Include="Widgets\ProjectSelect.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Widget\Asset\WigetAsset.h">
+    <ClInclude Include="Widgets\Widget.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Widget\Asset\ContentView.h">
+    <ClInclude Include="Widgets\ContentViewer.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Style\Icon.h">
+    <ClInclude Include="EditorAsset.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Widget\Asset\ContentViewItem.h">
+    <ClInclude Include="Widgets\DrawComponent.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Widget\Asset\Common.h">
+    <ClInclude Include="Widgets\ViewportCamera.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Widget\Asset\ContentTreeItem.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Widget\Hierarchy\WidgetHierarchy.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Widget\Viewport\WidgetViewport.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Widget\Console\WidgetConsole.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Widget\Console\Console.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Widget\WidgetDemo.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Widget\Downbar\Downbar.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Widget\Inspector\WidgetInspector.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Widget\WidgetCommon.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Widget\Inspector\Components\ComponentCommon.h">
+    <ClInclude Include="Widgets\RenderSetting.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

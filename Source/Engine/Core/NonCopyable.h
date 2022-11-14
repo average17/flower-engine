@@ -1,6 +1,6 @@
 #pragma once
 
-namespace flower 
+namespace Flower
 {
     class NonCopyable
     {
@@ -12,5 +12,4 @@ namespace flower
         NonCopyable(const NonCopyable&) = delete;
         const NonCopyable& operator=(const NonCopyable&) = delete;
     };
-
 }

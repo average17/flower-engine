@@ -1,199 +1,235 @@
 #pragma once
 
-#include "Error.h"
-#include "Instance.h"
-#include "Descriptor.h"
-#include "Device.h"
-#include "Shader.h"
-#include "Buffer.h"
-#include "Fence.h"
-#include "Sampler.h"
+#include "RHICommon.h"
 #include "SwapChain.h"
-#include "CommandBuffer.h"
-#include "Factory.h"
-#include "Common.h"
-#include "ImGuiCommon.h"
+#include "Sampler.h"
+#include "Descriptor.h"
+#include "Shader.h"
+#include "Resource.h"
 #include "Bindless.h"
-#include "ObjectUpload.h"
+#include "Query.h"
+#include "CommandBuffer.h"
 
-#include "../Core/Delegates.h"
+namespace Flower
+{
+	class VulkanContext : NonCopyable
+	{
+	private:
+		void pickupSuitableGpu(const std::vector<const char*>& requestExtens);
+		bool isPhysicalDeviceSuitable(const std::vector<const char*>& requestExtens);
+		void createLogicDevice(VkPhysicalDeviceFeatures features, void* nextChain, const std::vector<const char*>& requestExtens);
 
-namespace flower{
+	public:
+		SwapchainSupportDetails querySwapchainSupportDetail();
+		VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+		int32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
-    class RHI
-    {
-    private:
-        bool m_bOk = false;
-        bool m_swapchainChange = false;
+	private:
+		GLFWwindow* m_window;
+		VkSurfaceKHR m_surface = VK_NULL_HANDLE;
 
-    private:
-        std::vector<const char*> m_instanceLayerNames = {};
-        std::vector<const char*> m_instanceExtensionNames = {};
-        std::vector<const char*> m_deviceExtensionNames = {};
+		VkInstance m_instance = VK_NULL_HANDLE;
+		VkDebugUtilsMessengerEXT m_debugUtilsHandle = VK_NULL_HANDLE;
+		VkDebugReportCallbackEXT m_debugReportHandle = VK_NULL_HANDLE;
+		
+		VkDevice m_device = VK_NULL_HANDLE;
+		VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
+		VkPhysicalDeviceProperties m_physicalDeviceProperties{};
+		VkPhysicalDeviceMemoryProperties m_physicalDeviceMemoryProperties{};
+		GPUQueuesInfo m_queues;
 
-        VkPhysicalDeviceFeatures m_enableGpuFeatures = {};           // vulkan 1.0
-        VkPhysicalDeviceVulkan11Features m_enable11GpuFeatures = {}; // vulkan 1.1
-        VkPhysicalDeviceVulkan12Features m_enable12GpuFeatures = {}; // vulkan 1.2
-        VkPhysicalDeviceVulkan13Features m_enable13GpuFeatures = {}; // vulkan 1.3
+		VkFormat m_cacheSupportDepthStencilFormat;
+		VkFormat m_cacheSupportDepthOnlyFormat;
 
-        VkPhysicalDeviceProperties m_physicalDeviceProperties = {};
+		VkPhysicalDeviceDescriptorIndexingPropertiesEXT m_descriptorIndexingProperties{};
 
-    private:
-        GLFWwindow* m_window; 
-        VulkanSwapchain m_swapchain = {};
-        VulkanDevice    m_device    = {};
-        VkSurfaceKHR    m_surface   = VK_NULL_HANDLE;
-        VulkanInstance  m_instance  = {};
+		Swapchain m_swapchain;
+		SamplerCache m_samplerCache;
+		VmaAllocator m_vmaAllocator = {};
 
-        VkCommandPool m_graphicsCommandPool = VK_NULL_HANDLE;
-        VkCommandPool m_computeCommandPool = VK_NULL_HANDLE;
-        VkCommandPool m_copyCommandPool = VK_NULL_HANDLE;
+		DescriptorAllocator m_descriptorAllocator = {};
+		DescriptorLayoutCache m_descriptorLayoutCache = {};
 
-        DeletionQueue m_deletionQueue = {};
-        VmaAllocator  m_vmaAllocator = {};
-        GpuLoaderAsync m_uploader = {};
+		struct PresentContext
+		{
+			bool bSwapchainChange = false;
+			uint32_t imageIndex;
+			uint32_t currentFrame = 0;
+			std::vector<VkSemaphore> semaphoresImageAvailable;
+			std::vector<VkSemaphore> semaphoresRenderFinished;
+			std::vector<VkFence> inFlightFences;
+			std::vector<VkFence> imagesInFlight;
 
-    private: // cache
-        VulkanSamplerCache m_samplerCache = {};
-        VulkanShaderCache  m_shaderCache = {};
-        VulkanFencePool    m_fencePool = {};
+			void init();
+			void release();
+		} m_presentContext;
 
-        // descriptor allocator, it don't destroy when swapchain rebuild.
-        VulkanDescriptorAllocator m_staticDescriptorAllocator = {};
-        VulkanDescriptorLayoutCache m_descriptorLayoutCache = {};
+		ShaderCache m_shaderCache;
 
-    private: // swapchain relative.
-        uint32_t m_imageIndex;
-        uint32_t m_currentFrame = 0;
+		// Major graphics queue with priority 1.0f.
+		GPUCommandPool m_majorGraphicsPool;
 
-        int32_t  m_maxFramesInFlight;
-        std::vector<VkSemaphore> m_semaphoresImageAvailable;
-        std::vector<VkSemaphore> m_semaphoresRenderFinished;
-        std::vector<VkFence> m_inFlightFences;
-        std::vector<VkFence> m_imagesInFlight;
-        VkPhysicalDeviceDescriptorIndexingFeaturesEXT m_physicalDeviceDescriptorIndexingFeatures{};
-        VkPhysicalDeviceDescriptorIndexingPropertiesEXT m_descriptorIndexingProperties{};
+		// Major compute queue with priority 0.8f.
+		GPUCommandPool m_majorComputePool;
 
-    public:
-        DelegatesThreadSafe<RHI> onBeforeSwapchainRebuild;
-        DelegatesThreadSafe<RHI> onAfterSwapchainRebuild;
-        void forceRebuildSwapchain();
+		// Other command pool with priority 0.5f.
+		std::vector<GPUCommandPool> m_graphicsPools;
+		std::vector<GPUCommandPool> m_computePools;
+		std::vector<GPUCommandPool> m_copyPools;
 
-    private:
-        RHI() { }
-        bool swapchainRebuild();
-        void createCommandPool();
-        void createSyncObjects();
-        void createVmaAllocator();
+	private:
+		void initInstance(const std::vector<const char*>& requiredExtensions, const std::vector<const char*>& requiredLayers);
+		void releaseInstance();
 
-        void releaseCommandPool();
-        void releaseSyncObjects();
-        void recreateSwapChain();
-        void releaseVmaAllocator();
+		void initDevice(VkPhysicalDeviceFeatures features, const std::vector<const char*>& requestExtens, void* nextChain);
+		void releaseDevice();
 
-    public:
-        ~RHI();
+		void initVMA();
+		void releaseVMA();
 
-        static RHI* get();
-        void init(
-            GLFWwindow* window,
-            std::vector<const char*> instanceLayerNames = {},
-            std::vector<const char*> instanceExtensionNames = {},
-            std::vector<const char*> deviceExtensionNames = {}
-        );
-        void release();
-    
-    public:
-        uint32_t acquireNextPresentImage();
-        void present();
-        void waitIdle(){ vkDeviceWaitIdle(m_device); }
-        void submitAndResetFence(VkSubmitInfo& info);
-        void submitAndResetFence(VulkanSubmitInfo& info);
-        void submitAndResetFence(uint32_t count,VkSubmitInfo* infos);
-        void submit(VkSubmitInfo& info);
-        void submit(VulkanSubmitInfo& info);
-        void submit(uint32_t count,VkSubmitInfo* infos);
-        void resetFence();
+		void initCommandPool();
+		void releaseCommandPool();
 
-    public: // getter
-        VkPhysicalDeviceFeatures& getVkPhysicalDeviceFeatures() { return m_enableGpuFeatures; }
-        VmaAllocator& getVmaAllocator() { return m_vmaAllocator; }
-        VkQueue& getGraphicsQueue() { return m_device.graphicsQueue; }
-        VkQueue& getComputeQueue() { return m_device.computeQueue; }
-        const VkDevice& getDevice() const { return m_device.device; }
-        VulkanDevice* getVulkanDevice() { return &m_device; }
-        VkCommandPool& getGraphicsCommandPool() { return m_graphicsCommandPool; }
-        VkCommandPool& getComputeCommandPool() { return m_computeCommandPool; }
-        VkCommandPool& getCopyCommandPool() { return m_copyCommandPool; }
-        VkInstance getInstance() { return m_instance; }
-        VulkanFencePool& getFencePool() { return m_fencePool; }
-        VkPhysicalDeviceDescriptorIndexingPropertiesEXT getPhysicalDeviceDescriptorIndexingProperties() const { return m_descriptorIndexingProperties; }
+	public:
+		GLFWwindow* getWindow() { return m_window; }
+		VkSurfaceKHR getSurface() const { return m_surface; };
 
-        // for static descriptor cache in RHI.
-        VulkanDescriptorLayoutCache& getDescriptorLayoutCache() { return m_descriptorLayoutCache; }
+		VkFormat getSupportDepthStencilFormat() const { return m_cacheSupportDepthStencilFormat; }
+		VkFormat getSupportDepthOnlyFormat() const { return m_cacheSupportDepthOnlyFormat; }
 
-        const uint32_t getCurrentFrameIndex() { return m_currentFrame; }
-        VkSemaphore* getCurrentFrameWaitSemaphore() { return &m_semaphoresImageAvailable[m_currentFrame]; }
-        VkSemaphore getCurrentFrameWaitSemaphoreRef() { return m_semaphoresImageAvailable[m_currentFrame]; }
-        VkSemaphore* getCurrentFrameFinishSemaphore() { return &m_semaphoresRenderFinished[m_currentFrame]; }
-        VulkanSwapchain& getSwapchain() { return m_swapchain; }
-        std::vector<VkImageView>& getSwapchainImageViews() { return m_swapchain.getImageViews(); }
-        std::vector<VkImage>& getSwapchainImages() { return m_swapchain.getImages(); }
-        VkFormat getSwapchainFormat() const { return m_swapchain.getSwapchainImageFormat();  }
-        VkExtent2D getSwapchainExtent() const { return m_swapchain.getSwapchainExtent();  }
-        VkPhysicalDeviceProperties getPhysicalDeviceProperties() const { return m_physicalDeviceProperties; }
+		uint32_t getMaxMemoryAllocationCount() const { return m_physicalDeviceProperties.limits.maxMemoryAllocationCount; }
+	public:
+		void init(GLFWwindow* window);
+		void release();
+		void recreateSwapChain();
+	private:
+		int currentWidth;
+		int currentHeight;
+		int lastWidth  = ~0;
+		int lastHeight = ~0;
 
-        template <typename T> size_t getUniformBufferPadSize() const{ return packUniformBufferOffsetAlignment(sizeof(T)); }
+		bool swapchainRebuild();
+		
+		
+	public:
+		uint32_t acquireNextPresentImage();
+		void present();
+		void submit(uint32_t count, VkSubmitInfo* infos);
+		void submitNoFence(uint32_t count, VkSubmitInfo* infos);
+		void resetFence();
 
-        VkFormat findDepthStencilFormat();
+		MulticastDelegate<> onBeforeSwapchainRecreate;
+		MulticastDelegate<> onAfterSwapchainRecreate;
 
-        VulkanShaderCache& getShaderCache() { return m_shaderCache; }
+	public: 
+		// Major graphics queue used for present and ui render. priority 1.0.
+		VkQueue getMajorGraphicsQueue() const { return m_majorGraphicsPool.queue; }
+		VkCommandPool getMajorGraphicsCommandPool() const { return m_majorGraphicsPool.pool; }
+		VkCommandBuffer createMajorGraphicsCommandBuffer();
 
-    public:
-        VulkanVertexBuffer* createVertexBuffer(const std::vector<float>& data,std::vector<EVertexAttribute>&& as) = delete;
-        VulkanVertexBuffer* createVertexBuffer(const std::vector<float>& data,const std::vector<EVertexAttribute>& as);
-        VulkanIndexBuffer* createIndexBuffer(const std::vector<uint32_t>& data);
-        
-        VulkanShaderModule* getShader(const std::string& path,bool bReload = false);
-        VkShaderModule getVkShader(const std::string& path,bool bReload = false);
-        void addShaderModule(const std::string& path,bool bReload = false);
-        
-        VkQueue getAsyncCopyQueue() const;
-        
-        VulkanCommandBuffer* createGraphicsCommandBuffer(VkCommandBufferLevel level = VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-        VulkanCommandBuffer* createComputeCommandBuffer(VkCommandBufferLevel level = VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-        VulkanCommandBuffer* createCopyCommandBuffer(VkCommandBufferLevel level = VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-        
-        VulkanDescriptorFactory vkDescriptorFactoryBegin();
+		// Major compute queue. priority 0.8.
+		VkQueue getMajorComputeQueue() const { return m_majorComputePool.queue; }
+		VkCommandPool getMajorComputeCommandPool() const { return m_majorComputePool.pool; }
 
-        VkRenderPass createRenderpass(const VkRenderPassCreateInfo& info);
-        VkPipelineLayout createPipelineLayout(const VkPipelineLayoutCreateInfo& info);
-        
-        
-        void destroyRenderpass(VkRenderPass pass);
-        void destroyFramebuffer(VkFramebuffer fb);
-        void destroyPipeline(VkPipeline pipe);
-        void destroyPipelineLayout(VkPipelineLayout layout);
-        
-        size_t packUniformBufferOffsetAlignment(size_t originalSize) const;
+		// Other queues, priority 0.5.
+		const auto& getAsyncCopyCommandPools() const { return m_copyPools; }
+		const auto& getAsyncComputeCommandPools() const { return m_computePools; }
+		const auto& getAsyncGraphicsCommandPools() const { return m_graphicsPools; }
 
-        GpuLoaderAsync* getUploader() { return &m_uploader; }
-        
-    public:
-        VkSampler getSampler(VkSamplerCreateInfo info, uint32_t& outBindlessIndex);
+		VkInstance getInstance() const { return m_instance; }
+		VkPhysicalDeviceDescriptorIndexingPropertiesEXT getPhysicalDeviceDescriptorIndexingProperties() const { return m_descriptorIndexingProperties; }
 
-        VkSampler getPointClampBorderSampler(VkBorderColor);
-        VkSampler getPointClampEdgeSampler();
-        VkSampler getPointRepeatSampler();
-        VkSampler getLinearClampSampler();
-        VkSampler getLinearClampNoMipSampler();
-        VkSampler getLinearRepeatSampler();
+		const GPUQueuesInfo& getGPUQueuesInfo() const { return m_queues; }
+		uint32_t getGraphiscFamily() const { return m_queues.graphicsFamily; }
+		uint32_t getComputeFamily() const { return m_queues.computeFamily; }
+		uint32_t getCopyFamily() const { return m_queues.copyFamily; }
 
-        VkSampler getShadowFilterSampler();
+		DescriptorLayoutCache& getDescriptorLayoutCache() { return m_descriptorLayoutCache; }
 
-        BindlessSampler* getBindlessSampler() { return m_samplerCache.getBindless(); }
-    };
+		DescriptorFactory descriptorFactoryBegin();
+		VkPipelineLayout createPipelineLayout(const VkPipelineLayoutCreateInfo& info);
 
-    constexpr int32_t MAX_FRAMES_IN_FLIGHT = 3;
-    extern uint32_t getBackBufferCount();
+		const uint32_t getCurrentFrameIndex() const { return m_presentContext.currentFrame; }
+
+		Swapchain& getSwapchain() { return m_swapchain; }
+		std::vector<VkImageView>& getSwapchainImageViews() { return m_swapchain.getImageViews(); }
+		std::vector<VkImage>& getSwapchainImages() { return m_swapchain.getImages(); }
+
+		VkFormat getSwapchainFormat() const { return m_swapchain.getImageFormat(); }
+		VkExtent2D getSwapchainExtent() const { return m_swapchain.getExtent(); }
+
+		VkPhysicalDeviceProperties getPhysicalDeviceProperties() const { return m_physicalDeviceProperties; }
+
+		
+		VkSemaphore getCurrentFrameWaitSemaphore() const { return m_presentContext.semaphoresImageAvailable[m_presentContext.currentFrame]; }
+		VkSemaphore getCurrentFrameFinishSemaphore() const { return m_presentContext.semaphoresRenderFinished[m_presentContext.currentFrame]; }
+	};
+
+	namespace RHI
+	{
+		extern size_t GMaxSwapchainCount;
+
+		extern VkPhysicalDevice GPU;
+		extern VkDevice Device;
+		extern SamplerCache* SamplerManager;
+		extern VmaAllocator VMA;
+		extern ShaderCache* ShaderManager;
+
+		// Hdr 10.
+		enum DisplayMode
+		{
+			DISPLAYMODE_SDR,
+			DISPLAYMODE_HDR10_2084,
+			DISPLAYMODE_HDR10_SCRGB
+		};
+		extern DisplayMode eDisplayMode;
+		extern bool bSupportHDR;
+		extern bool bSupportHDR10_2084;
+		extern bool bSupportHDR10_SCRGB;
+		extern VkHdrMetadataEXT HdrMetadataEXT;
+
+		extern bool bSupportRayTrace;
+
+		inline constexpr auto get = []() { return Singleton<VulkanContext>::get(); };
+
+		extern void setResourceName(VkObjectType objectType, uint64_t handle, const char* name);
+
+		
+
+		extern void setPerfMarkerBegin(VkCommandBuffer cmd_buf, const char* name, const glm::vec4& color);
+		extern void setPerfMarkerEnd(VkCommandBuffer cmd_buf);
+
+		struct ScopePerframeMarker
+		{
+			VkCommandBuffer cmd;
+			ScopePerframeMarker(VkCommandBuffer cmdBuf, const char* name, const glm::vec4& color)
+				: cmd(cmdBuf)
+			{
+				setPerfMarkerBegin(cmdBuf, name, color);
+			}
+
+			~ScopePerframeMarker()
+			{
+				setPerfMarkerEnd(cmd);
+			}
+		};
+
+		extern void executeImmediately(VkCommandPool commandPool, VkQueue queue, std::function<void(VkCommandBuffer cb)>&& func);
+		extern void executeImmediatelyMajorGraphics(std::function<void(VkCommandBuffer cb)>&& func);
+		
+		// Used to compute RHI resource used.
+		extern void addGpuResourceMemoryUsed(size_t in);
+		extern void minusGpuResourceMemoryUsed(size_t in);
+		extern size_t getGpuResourceMemoryUsed();
+
+		extern PFN_vkCmdPushDescriptorSetKHR PushDescriptorSetKHR;
+		extern PFN_vkCmdPushDescriptorSetWithTemplateKHR PushDescriptorSetWithTemplateKHR;
+
+
+		// Functions for regular HDR ex: HDR10
+		extern PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR GetPhysicalDeviceSurfaceCapabilities2KHR;
+		extern PFN_vkGetPhysicalDeviceSurfaceFormats2KHR      GetPhysicalDeviceSurfaceFormats2KHR;
+		extern PFN_vkSetHdrMetadataEXT                        SetHdrMetadataEXT;
+
+	};
 }

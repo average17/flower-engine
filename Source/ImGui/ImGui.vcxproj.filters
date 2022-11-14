@@ -42,10 +42,13 @@
     <ClInclude Include="ImGuiTruetype.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="ImNodes.h">
+    <ClInclude Include="IconsFontAwesome6.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="ImnodesInternal.h">
+    <ClInclude Include="IconsFontAwesome6Brands.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiExtension.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -71,7 +74,7 @@
     <ClCompile Include="ImGuiDraw.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="ImNodes.cpp">
+    <ClCompile Include="ImGuiExtension.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

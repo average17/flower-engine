@@ -1,27 +1,15 @@
 #pragma once
+#include "RHICommon.h"
 
-#include "Device.h"
-#include <unordered_map>
-
-namespace flower
+namespace Flower
 {
-    struct VulkanDescriptorLayoutReference
+    class DescriptorAllocator
     {
-        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
-    };
-
-    struct VulkanDescriptorSetReference
-    {
-        VkDescriptorSet set = VK_NULL_HANDLE;
-    };
-
-    class VulkanDescriptorAllocator
-    {
-        friend class VulkanDescriptorFactory;
+        friend class DescriptorFactory;
     public:
         struct PoolSizes
         {
-            std::vector<std::pair<VkDescriptorType,float>> sizes =
+            std::vector<std::pair<VkDescriptorType, float>> sizes =
             {
                 { VK_DESCRIPTOR_TYPE_SAMPLER,                .5f },
                 { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4.f },
@@ -38,7 +26,6 @@ namespace flower
         };
 
     private:
-        VulkanDevice* m_device;
         VkDescriptorPool m_currentPool = VK_NULL_HANDLE;
         PoolSizes m_descriptorSizes;
         std::vector<VkDescriptorPool> m_usedPools;
@@ -50,13 +37,13 @@ namespace flower
         void resetPools();
 
         // allocate descriptor, maybe fail.
-        [[nodiscard]]bool allocate(VkDescriptorSet* set,VkDescriptorSetLayout layout);
+        [[nodiscard]] bool allocate(VkDescriptorSet* set, VkDescriptorSetLayout layout);
 
-        void init(VulkanDevice* newDevice);
-        void cleanup();
+        void init();
+        void release();
     };
 
-    class VulkanDescriptorLayoutCache
+    class DescriptorLayoutCache
     {
     public:
         struct DescriptorLayoutInfo
@@ -67,8 +54,6 @@ namespace flower
         };
 
     private:
-        VulkanDevice* m_device;
-
         struct DescriptorLayoutHash
         {
             std::size_t operator()(const DescriptorLayoutInfo& k) const
@@ -77,33 +62,42 @@ namespace flower
             }
         };
 
-        typedef std::unordered_map<DescriptorLayoutInfo,VkDescriptorSetLayout,DescriptorLayoutHash> DescriptorLayoutCache;
-        DescriptorLayoutCache m_layoutCache;
+        typedef std::unordered_map<DescriptorLayoutInfo, VkDescriptorSetLayout, DescriptorLayoutHash> LayoutCache;
+        LayoutCache m_layoutCache;
 
     public:
-        void init(VulkanDevice* newDevice);
-        void cleanup();
+        void init();
+        void release();
+
         VkDescriptorSetLayout createDescriptorLayout(VkDescriptorSetLayoutCreateInfo* info);
     };
 
-    class VulkanDescriptorFactory
+    class DescriptorFactory
     {
     public:
         // start building.
-        static VulkanDescriptorFactory begin(VulkanDescriptorLayoutCache* layoutCache,VulkanDescriptorAllocator* allocator);
+        static DescriptorFactory begin(DescriptorLayoutCache* layoutCache, DescriptorAllocator* allocator);
 
-        // use for buffer.
-        VulkanDescriptorFactory& bindBuffer(uint32_t binding,VkDescriptorBufferInfo* bufferInfo,VkDescriptorType type,VkShaderStageFlags stageFlags);
+        // use for buffers.
+        DescriptorFactory& bindBuffers(uint32_t binding, uint32_t count, VkDescriptorBufferInfo* bufferInfo, VkDescriptorType type, VkShaderStageFlags stageFlags);
 
-        // use for texture
-        VulkanDescriptorFactory& bindImage(uint32_t binding,VkDescriptorImageInfo*,VkDescriptorType type,VkShaderStageFlags stageFlags);
+        // use for textures.
+        DescriptorFactory& bindImages(uint32_t binding, uint32_t count, VkDescriptorImageInfo*, VkDescriptorType type, VkShaderStageFlags stageFlags);
 
-        // use for texture array.
-        VulkanDescriptorFactory& bindImages(uint32_t binding,uint32_t count,VkDescriptorImageInfo*,VkDescriptorType type,VkShaderStageFlags stageFlags);
+        bool build(VkDescriptorSet& set, VkDescriptorSetLayout& layout);
+        bool build(VkDescriptorSet& set);
 
-        bool build(VulkanDescriptorSetReference& set,VulkanDescriptorLayoutReference& layout);
-        bool build(VulkanDescriptorSetReference& set);
-        bool build(VkDescriptorSet* set);
+
+        // No info bind, need update descriptor set before rendering.
+        // use vkCmdPushDescriptorKHR to update.
+        DescriptorFactory& bindNoInfo(
+            VkDescriptorType type, 
+            VkShaderStageFlags stageFlags,
+            uint32_t binding, 
+            uint32_t count = 1);
+        void buildNoInfo(VkDescriptorSetLayout& layout, VkDescriptorSet& set);
+        void buildNoInfo(VkDescriptorSet& set);
+        void buildNoInfoPush(VkDescriptorSetLayout& layout);
 
     private:
         struct DescriptorWriteContainer
@@ -119,8 +113,8 @@ namespace flower
         std::vector<DescriptorWriteContainer> m_descriptorWriteBufInfos{ };
         std::vector<VkDescriptorSetLayoutBinding> m_bindings;
 
-        VulkanDescriptorLayoutCache* m_cache;
-        VulkanDescriptorAllocator* m_allocator;
+        DescriptorLayoutCache* m_cache;
+        DescriptorAllocator* m_allocator;
     };
 
 }

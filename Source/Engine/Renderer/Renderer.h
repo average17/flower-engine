@@ -1,68 +1,39 @@
 #pragma once
-#include "../Core/RuntimeModule.h"
-#include "../Core/Delegates.h"
+
+#include "../RuntimeModule.h"
 
 #include "ImGuiPass.h"
+#include "RendererCommon.h"
 #include "RenderTexturePool.h"
+#include "RenderSceneData.h"
 
-namespace flower
+namespace Flower
 {
-	constexpr uint32_t MIN_RENDER_SIZE = 64;
-
-	// for renderer module.
-	// you should always add uisystem module.
-
-	// simple renderer interface.
+	class DeferredRenderer;
 	class Renderer : public IRuntimeModule
 	{
+	private:
+		ImguiPass m_uiPass;
+		std::unique_ptr<RenderSceneData> m_sceneData;
+
+		// Major graphics queue's command and semaphores.
+		std::array<VkCommandBuffer, GBackBufferCount> m_dynamicGraphicsCommandBuffers;
+		std::array<VkSemaphore, GBackBufferCount> m_dynamicGraphicsCommandExecuteSemaphores;
+
+	public:
+		MulticastDelegate<const RuntimeModuleTickData&> imguiTickFunctions;
+		MulticastDelegate<const RuntimeModuleTickData&, VkCommandBuffer> rendererTickHooks;
+
+		RenderSceneData* getRenderScene() const
+		{
+			return m_sceneData.get();
+		}
+
 	public:
 		Renderer(ModuleManager* in, std::string name = "Renderer");
-		virtual ~Renderer() {  }
-
-		virtual void registerCheck() override;
 
 		virtual bool init() override;
 		virtual void release() override;
-
-		// i offer a simple tick function here for reference.
-		// you can override if you need.
-		virtual void tick(const TickData&) override;
-
-	protected:
-		std::unique_ptr<ImguiPass> m_ui = nullptr;
+		virtual void tick(const RuntimeModuleTickData& tickData) override;
 	};
-
-	class OffscreenRenderer: public Renderer
-	{
-	public:
-		OffscreenRenderer(ModuleManager* in, std::string name = "OffscreenRenderer");
-		virtual ~OffscreenRenderer() {  }
-
-		virtual bool init() override;
-		virtual void release() override;
-
-		uint32_t getRenderWidth() const { return m_offscreenRenderWidth; }
-		uint32_t getRenderHeight() const { return m_offscreenRenderHeight; }
-
-	protected:
-		uint32_t m_offscreenRenderWidth  = MIN_RENDER_SIZE;
-		uint32_t m_offscreenRenderHeight = MIN_RENDER_SIZE;
-
-		// common dynamic command buffer meaning it update every frame.
-		std::array<VulkanCommandBuffer*, MAX_FRAMES_IN_FLIGHT> m_dynamicGraphicsCommandBuffer;
-		std::array<VkSemaphore,MAX_FRAMES_IN_FLIGHT> m_dynamicGraphicsCommandExecuteSemaphores;
-
-		// async compute.
-
-	};
-
-
-	struct RenderStateMonitor
-	{
-		DelegatesSingleThread<RenderStateMonitor> callbacks;
-
-		void broadcast() { callbacks.broadcast(); }
-	};
-
-	extern RenderStateMonitor GRenderStateMonitor;
 }

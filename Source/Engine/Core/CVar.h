@@ -1,41 +1,42 @@
 #pragma once
 
-#include <cstdint>
-#include <string>
-#include <unordered_map>
-#include <shared_mutex>
-#include <algorithm> 
+#include "Core.h"
 
-#include "NonCopyable.h"
-
-// this is a simple thread safe console value system.
-
-namespace flower 
+namespace Flower
 {
-	constexpr auto CVAR_ARRAY_SIZE = 2000;
+	// Threadsafe cVar system.
+	// Also can see more detail from unreal engine source code.
+
+	// Four types.
+	// a. int32_t x4000
+	// b. float   x4000
+	// c. double  x1000
+	// d. string   x500
+
+	// CVar static element array max size.
+	constexpr auto  MAX_INT32_CVARS = 4000;
+	constexpr auto  MAX_FLOAT_CVARS = 4000;
+	constexpr auto MAX_DOUBLE_CVARS = 1000;
+	constexpr auto MAX_STRING_CVARS = 500;
 
 	enum CVarFlags
 	{
-		None         = 0x00000000,
+		None = 0x00000000,
 
 		// init once meaning it only set value by construct function before engine init.
 		// don't re-assign by other .json config files.
-		InitOnce     = 0x00000001 << 0,
+		InitOnce = 0x00000001 << 0,
 
-		// readonly meaning it will set value by construct function first, but maybe re-assign 
+		// read only meaning it will set value by construct function first, but maybe re-assign 
 		// other value in .json config files when engine init.
-		ReadOnly     = 0x00000001 << 1,
+		ReadOnly = 0x00000001 << 1,
 
 		// read and write, no limit.
 		ReadAndWrite = 0x00000001 << 2,
 
-		// modify value toggle render state change.
-		// all render res will rebuild.
-		RenderStateRelative = 0x00000001 << 3,
-
 		Max,
 	};
-	static_assert(CVarFlags::Max < 0xffffffff);
+	static_assert(CVarFlags::Max < 0x10000001);
 
 	enum class CVarType : uint8_t
 	{
@@ -67,6 +68,33 @@ namespace flower
 		T currentVal;
 		CVarParameter* parameter = nullptr;
 	};
+
+	template<typename T>
+	constexpr void checkRangeValid(int32_t index);
+
+	template<>
+	constexpr void checkRangeValid<float>(int32_t index)
+	{
+		CHECK(index < MAX_FLOAT_CVARS && "Cvar float count overflow, please add more capacity.");
+	}
+
+	template<>
+	constexpr void checkRangeValid<int32_t>(int32_t index)
+	{
+		CHECK(index < MAX_INT32_CVARS && "Cvar int32 count overflow, please add more capacity.");
+	}
+
+	template<>
+	constexpr void checkRangeValid<double>(int32_t index)
+	{
+		CHECK(index < MAX_DOUBLE_CVARS && "Cvar double count overflow, please add more capacity.");
+	}
+
+	template<>
+	constexpr void checkRangeValid<std::string>(int32_t index)
+	{
+		CHECK(index < MAX_STRING_CVARS && "Cvar string count overflow, please add more capacity.");
+	}
 
 	template<typename T>
 	struct CVarArray : private NonCopyable
@@ -110,9 +138,9 @@ namespace flower
 			cvars[index].currentVal = val;
 		}
 
-		inline int add(const T& value, CVarParameter* param)
+		inline int32_t add(const T& value, CVarParameter* param)
 		{
-			int index = lastCVar;
+			int32_t index = lastCVar;
 
 			cvars[index].currentVal = value;
 			cvars[index].initVal = value;
@@ -120,18 +148,22 @@ namespace flower
 			param->arrayIndex = index;
 			lastCVar++;
 
+			checkRangeValid<T>(lastCVar);
+
 			return index;
 		}
 
-		inline int add(const T& initialValue, const T& currentValue, CVarParameter* param)
+		inline int32_t add(const T& initialValue, const T& currentValue, CVarParameter* param)
 		{
-			int index = lastCVar;
+			int32_t index = lastCVar;
 
 			cvars[index].currentVal = currentValue;
 			cvars[index].initVal = initialValue;
 			cvars[index].parameter = param;
 			param->arrayIndex = index;
 			lastCVar++;
+
+			checkRangeValid<T>(lastCVar);
 
 			return index;
 		}
@@ -146,13 +178,15 @@ namespace flower
 			return &cVarSystem;
 		}
 
-		// getter functions.
-		CVarArray<std::string>& getStringArray() { return m_stringCVars; }
-		    CVarArray<int32_t>& getInt32Array()  { return  m_int32CVars; }
-		      CVarArray<float>& getFloatArray()  { return  m_floatCVars; }
-		     CVarArray<double>& getDoubleArray() { return m_doubleCVars; }
+		// Getter functions.
+		template<typename T> CVarArray<T>& getArray();
+		template<> CVarArray<std::string>& getArray() { return m_stringCVars; }
+		template<> CVarArray<int32_t>&     getArray() { return m_int32CVars;  }
+		template<> CVarArray<float>&       getArray() { return m_floatCVars;  }
+		template<> CVarArray<double>&      getArray() { return m_doubleCVars; }
 
 	private:
+		// Simple hash by cVar name.
 		inline size_t hash(std::string str)
 		{
 			std::transform(str.begin(), str.end(), str.begin(), ::tolower);
@@ -179,15 +213,10 @@ namespace flower
 		}
 
 	private:
-		constexpr static int  MAX_INT32_CVARS{ CVAR_ARRAY_SIZE };
-		constexpr static int  MAX_FLOAT_CVARS{ CVAR_ARRAY_SIZE };
-		constexpr static int MAX_DOUBLE_CVARS{ CVAR_ARRAY_SIZE };
-		constexpr static int MAX_STRING_CVARS{ CVAR_ARRAY_SIZE };
-
 		CVarArray<int32_t>       m_int32CVars{ MAX_INT32_CVARS };
 		CVarArray<float>         m_floatCVars{ MAX_FLOAT_CVARS };
-		CVarArray<double>      m_doubleCVars{ MAX_DOUBLE_CVARS };
-		CVarArray<std::string> m_stringCVars{ MAX_STRING_CVARS };
+		CVarArray<double>       m_doubleCVars{ MAX_DOUBLE_CVARS };
+		CVarArray<std::string>  m_stringCVars{ MAX_STRING_CVARS };
 
 		std::shared_mutex m_lockMutex;
 		std::unordered_map<size_t, CVarParameter> m_cacheCVars;
@@ -202,37 +231,16 @@ namespace flower
 			return &newParm;
 		}
 
-		template<typename T>
-		CVarArray<T>* getCVarArray();
-
-		template<>
-		CVarArray<int32_t>* getCVarArray()
-		{
-			return &m_int32CVars;
-		}
-
-		template<>
-		CVarArray<float>* getCVarArray()
-		{
-			return &m_floatCVars;
-		}
-
-		template<>
-		CVarArray<double>* getCVarArray()
-		{
-			return &m_doubleCVars;
-		}
-
-		template<>
-		CVarArray<std::string>* getCVarArray()
-		{
-			return &m_stringCVars;
-		}
+		template<typename T> CVarArray<T>* getCVarArray();
+		template<> CVarArray<int32_t>* getCVarArray(){return &m_int32CVars;}
+		template<> CVarArray<float>* getCVarArray(){return &m_floatCVars;}
+		template<> CVarArray<double>* getCVarArray(){return &m_doubleCVars;}
+		template<> CVarArray<std::string>* getCVarArray() { return &m_stringCVars;}
 
 		template<typename T>
 		inline T* getCVarCurrent(const char* name)
 		{
-			CVarParameter* par = getCVar(name);
+			CVarParameter* par = getCVarParameter(name);
 			if (!par)
 			{
 				return nullptr;
@@ -246,7 +254,7 @@ namespace flower
 		template<typename T>
 		inline void setCVarCurrent(const char* name, const T& value)
 		{
-			CVarParameter* cvar = getCVar(name);
+			CVarParameter* cvar = getCVarParameter(name);
 
 			if (cvar)
 			{
@@ -255,7 +263,7 @@ namespace flower
 		}
 
 	public:
-		CVarParameter* getCVar(const char* name)
+		CVarParameter* getCVarParameter(const char* name)
 		{
 			std::shared_lock<std::shared_mutex> lock(m_lockMutex);
 			size_t hashKey = hash(name);
@@ -268,44 +276,16 @@ namespace flower
 			return nullptr;
 		}
 
-		inline float* getFloatCVar(const char* name)
+		template<typename T>
+		T* getCVar(const char* name)
 		{
-			return getCVarCurrent<float>(name);
+			return getCVarCurrent<T>(name);
 		}
 
-		inline double* getDoubleCVar(const char* name)
+		template<typename T>
+		void setCVar(const char* name, T value)
 		{
-			return getCVarCurrent<double>(name);
-		}
-
-		inline int32_t* getInt32CVar(const char* name)
-		{
-			return getCVarCurrent<int32_t>(name);
-		}
-
-		inline std::string* getStringCVar(const char* name)
-		{
-			return getCVarCurrent<std::string>(name);
-		}
-
-		inline void setFloatCVar(const char* name, float value)
-		{
-			setCVarCurrent<float>(name, value);
-		}
-
-		inline void setDoubleCVar(const char* name, double value)
-		{
-			setCVarCurrent<double>(name, value);
-		}
-
-		inline void setInt32CVar(const char* name, int32_t value)
-		{
-			setCVarCurrent<int32_t>(name, value);
-		}
-
-		inline void setStringCVar(const char* name, const char* value)
-		{
-			setCVarCurrent<std::string>(name, value);
+			setCVarCurrent<T>(name, value);
 		}
 
 	private:
@@ -320,7 +300,10 @@ namespace flower
 		{
 			std::unique_lock<std::shared_mutex> lock(m_lockMutex);
 			CVarParameter* param = initCVar(name, description);
-			if (!param) return nullptr;
+			if (!param) 
+			{
+				return nullptr;
+			}
 
 			param->type = type;
 			param->category = category;
@@ -409,7 +392,7 @@ namespace flower
 	struct AutoCVar
 	{
 	protected:
-		int index;
+		int32_t index;
 		using CVarType = T;
 	};
 
@@ -464,6 +447,9 @@ namespace flower
 		inline double* getPtr();
 		inline void    set(double val);
 	};
+	
+	struct AutoCVarInt32;
+	using AutoCVarCmd = AutoCVarInt32;
 
 	struct AutoCVarInt32 : AutoCVar<int32_t>
 	{
@@ -486,10 +472,39 @@ namespace flower
 			index = cvar->arrayIndex;
 		}
 
+		// Auto Cmd.
+		AutoCVarInt32(
+			const char* name,
+			const char* description)
+		{
+			const char* category = "Cmd";
+			int32_t defaultValue = 0;
+			CVarParameter* cvar = CVarSystem::get()->addInt32CVar(
+				name,
+				description,
+				category,
+				defaultValue,
+				defaultValue
+			);
+
+			cvar->flag = uint32_t(CVarFlags::ReadAndWrite);
+			index = cvar->arrayIndex;
+		}
+
 		inline int32_t  get();
 		inline int32_t* getPtr();
 		inline void     set(int32_t val);
 	};
+
+	// Handle cvar cmd.
+	inline void CVarCmdHandle(AutoCVarCmd& in, std::function<void()>&& func)
+	{
+		if (in.get() > 0)
+		{
+			in.set(0);
+			func();
+		}
+	}
 
 	struct AutoCVarString : AutoCVar<std::string>
 	{

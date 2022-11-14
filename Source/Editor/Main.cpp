@@ -1,12 +1,8 @@
+#include "Pch.h"
 #include "Editor.h"
 
 int main()
 {
-	Editor::init();
-
-	Editor::loop();
-
-	Editor::release();
-
+	GEditor->run();
 	return 0;
 }

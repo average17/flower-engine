@@ -1,29 +1,17 @@
+#include "Pch.h"
 #include "Transform.h"
 #include "../SceneNode.h"
-
+#include "../Component.h"
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-namespace flower 
+namespace Flower
 {
-	void Transform::updateWorldTransform()
+	void Transform::tick(const RuntimeModuleTickData& tickData)
 	{
 		m_prevWorldMatrix = m_worldMatrix;
-		if (m_bUpdateFlag)
-		{
-			m_worldMatrix = getMatrix();
-			auto parent = getNode()->getParent();
-
-			// recursive multiply all parent's world matrix.
-			if (parent)
-			{
-				auto transform = parent->getComponent<Transform>();
-				m_worldMatrix  = transform->getWorldMatrix() * m_worldMatrix;
-			}
-
-			m_bUpdateFlag = !m_bUpdateFlag;
-		}
+		updateWorldTransform();
 	}
 
 	void Transform::invalidateWorldMatrix()
@@ -61,12 +49,27 @@ namespace flower
 		return m_translation;
 	}
 
+	glm::vec3& Transform::getTranslation()
+	{
+		return m_translation;
+	}
+
 	const glm::quat& Transform::getRotation() const
 	{
 		return m_rotation;
 	}
 
+	glm::quat& Transform::getRotation()
+	{
+		return m_rotation;
+	}
+
 	const glm::vec3& Transform::getScale() const
+	{
+		return m_scale;
+	}
+
+	glm::vec3& Transform::getScale()
 	{
 		return m_scale;
 	}
@@ -100,4 +103,21 @@ namespace flower
 		return m_prevWorldMatrix;
 	}
 
+	void Transform::updateWorldTransform()
+	{
+		if (m_bUpdateFlag)
+		{
+			m_worldMatrix = getMatrix();
+			auto parent = getNode()->getParent();
+
+			// recursive multiply all parent's world matrix.
+			if (parent)
+			{
+				auto transform = parent->getComponent<Transform>();
+				m_worldMatrix = transform->getWorldMatrix() * m_worldMatrix;
+			}
+
+			m_bUpdateFlag = !m_bUpdateFlag;
+		}
+	}
 }

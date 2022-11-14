@@ -1,101 +1,233 @@
+#include "Pch.h"
 #include "RenderTexturePool.h"
-#include <crcpp/crc.h>
 
-namespace flower
+namespace Flower
 {
-	void RenderTexturePool::release()
+	bool RenderTexturePool::PoolImage::isValid()
 	{
-		RHI::get()->waitIdle();
-
-		for(auto& pair : m_allocatedImages)
-		{
-			for(VulkanImage* image : pair.second)
-			{
-				delete image;
-				image =  nullptr;
-			}
-		}
-
-		m_allocatedImages.clear();
-		m_freePools.clear();
+		return
+			m_pool != nullptr &&
+			m_hashId != ~0 &&
+			m_id != ~0 &&
+			m_image.lock();
 	}
 
-	RenderTexturePool::RenderTextureReference RenderTexturePool::requestRenderTexture(const RenderTextureCreateInfo& info)
+	VulkanImage& RenderTexturePool::PoolImage::getImage()
 	{
-		RenderTextureReference result{};
+		CHECK(isValid());
+		return *m_image.lock().get();
+	}
 
-		RenderTextureCreateInfo ci = info;
-		uint32_t descHash = CRC::Calculate(&ci, sizeof(RenderTextureCreateInfo), CRC::CRC_32());
-
-		result.m_pool = this;
-		result.m_descHash = descHash;
-
-		auto& imagePool = m_allocatedImages[descHash];
-		auto& freeHashSet = m_freePools[descHash];
-
-		// if free hash set exist free elements, just use that.
-		if(freeHashSet.size() > 0)
+	void RenderTexturePool::PoolImage::release()
+	{
+		if (!isValid())
 		{
-			result.m_physicalId = *freeHashSet.end();
-			result.m_image = imagePool[result.m_physicalId];
+			return;
+		}
 
-			// remove free elemt.
-			freeHashSet.erase(freeHashSet.end());
+		m_pool->releasePoolImage(*this);
+
+		m_hashId = ~0;
+		m_id = ~0;
+		m_pool = nullptr;
+	}
+
+	PoolImageSharedRef RenderTexturePool::createPoolImage(
+		const char* name,
+		uint32_t width,
+		uint32_t height,
+		VkFormat format,
+		VkImageUsageFlags usage,
+		int32_t mipmapCount,
+		uint32_t depth,
+		uint32_t arrayLayers,
+		VkSampleCountFlagBits sampleCount,
+		VkImageCreateFlags flags)
+	{
+		VkImageType imgType = depth > 1 ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
+		uint32_t trueMipmapLevels = mipmapCount == -1 ? getMipLevelsCount(width, height) : mipmapCount;
+
+		VkImageCreateInfo info{};
+		info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		info.flags = flags;
+		info.imageType = imgType;
+		info.format = format;
+		info.extent.width = width;
+		info.extent.height = height;
+		info.extent.depth = depth;
+		info.mipLevels = trueMipmapLevels;
+		info.samples = sampleCount;
+		info.usage = usage;
+		info.arrayLayers = arrayLayers;
+
+		// Some hardcode input.
+		info.tiling = VK_IMAGE_TILING_OPTIMAL;
+		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		info.queueFamilyIndexCount = 0;
+		info.pQueueFamilyIndices = nullptr;
+		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+		return createPoolImage(name, info);
+	}
+
+	PoolImageSharedRef RenderTexturePool::createPoolCubeImage(
+		const char* name, 
+		uint32_t width, 
+		uint32_t height, 
+		VkFormat format, 
+		VkImageUsageFlags usage, 
+		int32_t mipmapCount, 
+		VkSampleCountFlagBits sampleCount)
+	{
+
+		return createPoolImage(name, width, height, format, usage, mipmapCount, 1, 6, sampleCount, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
+	}
+
+	PoolImageSharedRef RenderTexturePool::createPoolImage(const char* name, const VkImageCreateInfo& info)
+	{
+		const size_t createInfoHash = CRCHash(info);
+
+		PoolImageStorage storage(this);
+		storage.poolInfo.m_hashId = createInfoHash;
+
+		if (m_freeImages[createInfoHash].size() <= 0)
+		{
+			// No free image can use, create new one.
+			storage.poolInfo.m_id = m_idAccumulator;
+			storage.image = VulkanImage::create(name, info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+			storage.poolInfo.m_image = storage.image;
+
+			// update id.
+			m_idAccumulator++;
 		}
 		else
 		{
-			VkImageCreateInfo createInfo{};
-			createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-			createInfo.flags = {};
-			
-			createInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-			createInfo.queueFamilyIndexCount = 0;
-			createInfo.pQueueFamilyIndices = nullptr;
+			// exist free image, reuse.
+			storage = m_freeImages[createInfoHash].back();
 
-			createInfo.tiling = info.tiling;
-			createInfo.usage = info.usage;
-			createInfo.samples = info.samples;
-			createInfo.imageType = info.imageType;
-			createInfo.format = info.format;
-			createInfo.extent = info.extent;
-			createInfo.mipLevels = info.mipLevels;
-			createInfo.arrayLayers = info.arrayLayers;
+			CHECK(storage.poolInfo.m_id != ~0);
+			CHECK(storage.poolInfo.m_freeCounter != ~0);
+			CHECK(storage.poolInfo.m_image.lock());
+			CHECK(storage.image);
 
-			// we need to create new one.
-			VulkanImage* newImage = VulkanImage::create(
-				createInfo,
-				VK_IMAGE_VIEW_TYPE_MAX_ENUM, // don't create image view so just fill max enum.
-				VK_IMAGE_ASPECT_NONE_KHR, // don't create image view so just fill none.
-				false, // don't create image view.
-				info.memUsage
-			);
+			m_freeImages[createInfoHash].pop_back();
 
-			result.m_image = newImage;
-			result.m_physicalId = imagePool.size();
+			// reset free counter.
+			storage.poolInfo.m_freeCounter = ~0;
 
-			imagePool.push_back(newImage);
+			storage.image->rename(name);
 		}
 
+		m_busyImages[createInfoHash].push_back(storage);
+
+		PoolImageSharedRef result = std::shared_ptr<PoolImageRef>(new PoolImageRef());
+		result->m_image = storage.poolInfo;
 		return result;
 	}
 
-	void RenderTexturePool::RenderTextureReference::release()
+	void RenderTexturePool::releasePoolImage(const PoolImage& in)
 	{
-		auto& freeHashSet = m_pool->m_freePools[m_descHash];
-		CHECK((!freeHashSet.contains(m_physicalId)) && 
-			"Some error happen, free pool should no contains data before we release.");
-		
-		freeHashSet.emplace(m_physicalId);
+		CHECK(in.m_hashId != ~0);
+		CHECK(in.m_image.lock());
+
+		auto& busyArray = m_busyImages[in.m_hashId];
+
+		poolSizeSafeCheck(busyArray.size());
+		CHECK(busyArray.size() >= 1);
+
+		PoolImageStorage storage(this);
+		storage.poolInfo = in;
+
+		for (int32_t i = 0; i < busyArray.size(); ++i)
+		{
+			if (busyArray[i].poolInfo.m_id == in.m_id)
+			{
+				// Store image owner.
+				storage.image = busyArray[i].image;
+				busyArray.erase(busyArray.begin() + i);
+				break;
+			}
+		}
+		CHECK(storage.image);
+		CHECK(storage.poolInfo.m_image.lock() == storage.image);
+
+		// Update free counter.
+		storage.poolInfo.m_freeCounter = m_innerCounter;
+		m_freeImages[in.m_hashId].push_back(storage);
+
+		// Mark tick state active so we can release free rt immediately.
+		m_bRecentRelease = true;
 	}
 
-	VulkanImage* RenderTexturePool::RenderTextureReference::getImage()
+	void RenderTexturePool::tick()
 	{
-		return m_image;
-	}
+		poolSizeSafeCheck(m_freeImages.size());
+		poolSizeSafeCheck(m_busyImages.size());
 
-	bool RenderTexturePool::RenderTextureReference::isValid() const
-	{ 
-		return m_pool != nullptr && m_image != nullptr;
+		// Tick find free render texture which can release.
+		if (m_bRecentRelease && (m_innerCounter % 5 == 0))
+		{
+			std::vector<size_t> unusedKey{};
+			for (auto& pair : m_freeImages)
+			{
+				// Safe check.
+				poolSizeSafeCheck(pair.second.size());
+
+				if (pair.second.size() == 0)
+				{
+					unusedKey.push_back(pair.first);
+				}
+				else
+				{
+					auto it = pair.second.begin();
+					while (it != pair.second.end())
+					{
+						if (shouldRelease(it->poolInfo.m_freeCounter))
+						{
+							it = pair.second.erase(it);
+						}
+						else
+						{
+							++it;
+						}
+					}
+				}
+			}
+
+			// Shrink empty free image map.
+			for (auto& key : unusedKey)
+			{
+				m_freeImages.erase(key);
+			}
+
+			if (m_freeImages.empty())
+			{
+				m_bRecentRelease = false;
+			}
+		}
+
+		// Busy image map shrink.
+		if (m_innerCounter % 11 == 0)
+		{
+			std::vector<size_t> unusedKey{};
+			for (auto& busyPair : m_busyImages)
+			{
+				// Safe check.
+				poolSizeSafeCheck(busyPair.second.size());
+
+				if (busyPair.second.size() == 0)
+				{
+					unusedKey.push_back(busyPair.first);
+				}
+			}
+
+			for (auto& key : unusedKey)
+			{
+				m_busyImages.erase(key);
+			}
+		}
+
+		m_innerCounter ++;
 	}
 }

@@ -1,218 +1,118 @@
-#include "Sampler.h"
+#include "Pch.h"
 #include "RHI.h"
-#include "Bindless.h"
+#include "Sampler.h"
 
-#include <sstream>
-#include <string>
-#include <functional>
-#include <crcpp/crc.h>
-
-namespace flower
+namespace Flower
 {
-    void VulkanSamplerCache::init(VulkanDevice* newDevice)
+    void SamplerCache::init()
     {
-	    m_device = newDevice;
 
-        // init bindless set.
-        m_bindlessSamplerSet = std::make_unique<BindlessSampler>();
-        m_bindlessSamplerSet->init();
     }
 
-    void VulkanSamplerCache::cleanup()
+    void SamplerCache::release()
     {
-        for(auto& pair : m_samplerCache)
+        for (auto& cache : m_cache)
         {
-            // release sampler.
-            vkDestroySampler(*m_device, pair.second.second, nullptr);
+            vkDestroySampler(RHI::Device, cache.second.second, nullptr);
         }
-        m_samplerCache.clear();
-
-        // release bindless set.
-        m_bindlessSamplerSet->release();
+        m_cache.clear();
     }
 
-    VkSampler VulkanSamplerCache::createSampler(VkSamplerCreateInfo* info, uint32_t& outBindlessIndex)
+    VkSampler SamplerCache::createSampler(VkSamplerCreateInfo info)
+    {
+        uint32_t index = 0;
+        return createSampler(info, index);
+    }
+
+    VkSampler SamplerCache::createSampler(VkSamplerCreateInfo info, uint32_t& outBindlessIndex)
     {
         SamplerCreateInfo sci{};
-        sci.info = *info;
-    
-        auto it = m_samplerCache.find(sci);
-        if(it != m_samplerCache.end())
+        sci.info = info;
+
+        auto it = m_cache.find(sci);
+        if (it != m_cache.end())
         {
-            outBindlessIndex = (*it).second.first;
+            outBindlessIndex = it->second.first;
             return (*it).second.second;
         }
         else
         {
             VkSampler sampler;
-            vkCheck(vkCreateSampler(*m_device, &sci.info, nullptr, &sampler));
+            RHICheck(vkCreateSampler(RHI::Device, &sci.info, nullptr, &sampler));
 
-            uint32_t bindlessIndex = m_bindlessSamplerSet->updateSamplerToBindlessDescriptorSet(sampler);
+            uint32_t bindlessIndex = Bindless::Sampler->updateSamplerToBindlessDescriptorSet(sampler);
             outBindlessIndex = bindlessIndex;
-
-            m_samplerCache[sci] = { bindlessIndex, sampler };
+            m_cache[sci] = { bindlessIndex, sampler };
             return sampler;
         }
     }
 
-    bool VulkanSamplerCache::SamplerCreateInfo::operator==(const SamplerCreateInfo& other) const
+    bool SamplerCache::SamplerCreateInfo::operator==(const SamplerCreateInfo& other) const
     {
-        return  (other.info.addressModeU == this->info.addressModeU) && 
-                (other.info.addressModeV == this->info.addressModeV) && 
-                (other.info.addressModeW == this->info.addressModeW) && 
-                (other.info.anisotropyEnable == this->info.anisotropyEnable) && 
-                (other.info.borderColor == this->info.borderColor) && 
-                (other.info.compareEnable == this->info.compareEnable) && 
-                (other.info.compareOp == this->info.compareOp) && 
-                (other.info.flags == this->info.flags) && 
-                (other.info.magFilter == this->info.magFilter) && 
-                (other.info.maxAnisotropy == this->info.maxAnisotropy) && 
-                (other.info.maxLod == this->info.maxLod) && 
-                (other.info.minFilter == this->info.minFilter) && 
-                (other.info.minLod == this->info.minLod) && 
-                (other.info.mipmapMode == this->info.mipmapMode) && 
-                (other.info.unnormalizedCoordinates == this->info.unnormalizedCoordinates);
+        return other.hash() == hash();
     }
 
-    size_t VulkanSamplerCache::SamplerCreateInfo::hash() const
+    size_t SamplerCache::SamplerCreateInfo::hash() const
     {
-        return CRC::Calculate(&this->info, sizeof(VkSamplerCreateInfo), CRC::CRC_32());
+        return CRCHash(info);
     }
 
-    void SamplerFactory::buildPointClampBorderSampler(VkBorderColor borderColor)
+    VkDescriptorSet SamplerCache::getCommonDescriptorSet()
     {
-        this->
-             MagFilter(VK_FILTER_NEAREST)
-            .MinFilter(VK_FILTER_NEAREST)
-            .MipmapMode(VK_SAMPLER_MIPMAP_MODE_NEAREST)
-            .AddressModeU(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER)
-            .AddressModeV(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER)
-            .AddressModeW(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER)
-            .BorderColor(borderColor)
-            .UnnormalizedCoordinates(VK_FALSE)
-            .MaxAnisotropy(1.0f)
-            .AnisotropyEnable(VK_FALSE)
-            .MinLod(-10000.0f)
-            .MaxLod(10000.0f)
-            .MipLodBias(0.0f);
+        if (m_cacheCommonDescriptor == VK_NULL_HANDLE)
+        {
+            initCommonDescriptorSet();
+        }
+
+        return m_cacheCommonDescriptor;
     }
 
-    void SamplerFactory::buildPointClampEdgeSampler()
+    void SamplerCache::initCommonDescriptorSet()
     {
-        this->
-             MagFilter(VK_FILTER_NEAREST)
-            .MinFilter(VK_FILTER_NEAREST)
-            .MipmapMode(VK_SAMPLER_MIPMAP_MODE_NEAREST)
-            .AddressModeU(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-            .AddressModeV(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-            .AddressModeW(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-            .CompareEnable(VK_FALSE)
-            .UnnormalizedCoordinates(VK_FALSE)
-            .MaxAnisotropy(1.0f)
-            .AnisotropyEnable(VK_FALSE)
-            .MinLod(-10000.0f)
-            .MaxLod(10000.0f)
-            .MipLodBias(0.0f);
+        VkDescriptorImageInfo pointClampEdgeInfo{};
+        pointClampEdgeInfo.sampler = createSampler(SamplerFactory::pointClampEdge());
+
+        VkDescriptorImageInfo pointClampBorder0000Info{};
+        pointClampBorder0000Info.sampler = createSampler(SamplerFactory::pointClampBorder0000());
+
+        VkDescriptorImageInfo pointRepeatInfo{};
+        pointRepeatInfo.sampler = createSampler(SamplerFactory::pointRepeat());
+
+        VkDescriptorImageInfo linearClampEdgeInfo{};
+        linearClampEdgeInfo.sampler = createSampler(SamplerFactory::linearClampEdgeMipPoint());
+
+        VkDescriptorImageInfo linearClampBorder0000Info{};
+        linearClampBorder0000Info.sampler = createSampler(SamplerFactory::linearClampBorder0000MipPoint());
+
+
+        VkDescriptorImageInfo linearRepeatInfo{};
+        linearRepeatInfo.sampler = createSampler(SamplerFactory::linearRepeatMipPoint());
+
+        VkDescriptorImageInfo linearClampBorder1111Info{};
+        linearClampBorder1111Info.sampler = createSampler(SamplerFactory::linearClampBorder1111MipPoint());
+
+
+        VkDescriptorImageInfo pointClampBorder1111Info{};
+        pointClampBorder1111Info.sampler = createSampler(SamplerFactory::pointClampBorder1111());
+
+        RHI::get()->descriptorFactoryBegin()
+            .bindImages(0, 1, &pointClampEdgeInfo, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+            .bindImages(1, 1, &pointClampBorder0000Info, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+            .bindImages(2, 1, &pointRepeatInfo, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+            .bindImages(3, 1, &linearClampEdgeInfo, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+            .bindImages(4, 1, &linearClampBorder0000Info, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+            .bindImages(5, 1, &linearRepeatInfo, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+            .bindImages(6, 1, &linearClampBorder1111Info, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+            .bindImages(7, 1, &pointClampBorder1111Info, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+            .build(m_cacheCommonDescriptor, m_cacheCommonDescriptorSetLayout);
     }
 
-    void SamplerFactory::buildPointRepeatSampler()
+    VkDescriptorSetLayout SamplerCache::getCommonDescriptorSetLayout()
     {
-        this->
-             MagFilter(VK_FILTER_NEAREST)
-            .MinFilter(VK_FILTER_NEAREST)
-            .MipmapMode(VK_SAMPLER_MIPMAP_MODE_NEAREST)
-            .AddressModeU(VK_SAMPLER_ADDRESS_MODE_REPEAT)
-            .AddressModeV(VK_SAMPLER_ADDRESS_MODE_REPEAT)
-            .AddressModeW(VK_SAMPLER_ADDRESS_MODE_REPEAT)
-            .CompareOp(VK_COMPARE_OP_LESS)
-            .CompareEnable(VK_FALSE)
-            .BorderColor(VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK)
-            .UnnormalizedCoordinates(VK_FALSE)
-            .MaxAnisotropy(1.0f)
-            .AnisotropyEnable(VK_FALSE)
-            .MinLod(-10000.0f)
-            .MaxLod(10000.0f)
-            .MipLodBias(0.0f);
+        if (m_cacheCommonDescriptorSetLayout == VK_NULL_HANDLE)
+        {
+            initCommonDescriptorSet();
+        }
+        return m_cacheCommonDescriptorSetLayout;
     }
-
-    void SamplerFactory::buildLinearClampSampler()
-    {
-        this->
-             MagFilter(VK_FILTER_LINEAR)
-            .MinFilter(VK_FILTER_LINEAR)
-            .MipmapMode(VK_SAMPLER_MIPMAP_MODE_LINEAR)
-            .AddressModeU(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-            .AddressModeV(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-            .AddressModeW(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-            .CompareOp(VK_COMPARE_OP_LESS)
-            .CompareEnable(VK_FALSE)
-            .BorderColor(VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE)
-            .UnnormalizedCoordinates(VK_FALSE)
-            .MaxAnisotropy(1.0f)
-            .AnisotropyEnable(VK_FALSE)
-            .MinLod(-10000.0f)
-            .MaxLod(10000.0f)
-            .MipLodBias(0.0f);
-    }
-
-    void SamplerFactory::buildLinearClampNoMipSampler()
-    {
-        this->
-             MagFilter(VK_FILTER_LINEAR)
-            .MinFilter(VK_FILTER_LINEAR)
-            .MipmapMode(VK_SAMPLER_MIPMAP_MODE_NEAREST)
-            .AddressModeU(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-            .AddressModeV(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-            .AddressModeW(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-            .CompareOp(VK_COMPARE_OP_LESS)
-            .CompareEnable(VK_FALSE)
-            .BorderColor(VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE)
-            .UnnormalizedCoordinates(VK_FALSE)
-            .MaxAnisotropy(1.0f)
-            .AnisotropyEnable(VK_FALSE)
-            .MinLod(-10000.0f)
-            .MaxLod(10000.0f)
-            .MipLodBias(0.0f);
-    }
-
-    void SamplerFactory::buildLinearRepeatSampler()
-    {
-        this->
-             MagFilter(VK_FILTER_LINEAR)
-            .MinFilter(VK_FILTER_LINEAR)
-            .MipmapMode(VK_SAMPLER_MIPMAP_MODE_LINEAR)
-            .AddressModeU(VK_SAMPLER_ADDRESS_MODE_REPEAT)
-            .AddressModeV(VK_SAMPLER_ADDRESS_MODE_REPEAT)
-            .AddressModeW(VK_SAMPLER_ADDRESS_MODE_REPEAT)
-            .CompareOp(VK_COMPARE_OP_LESS)
-            .CompareEnable(VK_FALSE)
-            .BorderColor(VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK)
-            .UnnormalizedCoordinates(VK_FALSE)
-            .MaxAnisotropy(1.0f)
-            .AnisotropyEnable(VK_FALSE)
-            .MinLod(-10000.0f)
-            .MaxLod(10000.0f)
-            .MipLodBias(0.0f);
-    }
-
-    void SamplerFactory::buildShadowFilterSampler()
-    {
-        this->
-             MagFilter(VK_FILTER_NEAREST)
-            .MinFilter(VK_FILTER_NEAREST)
-            .MipmapMode(VK_SAMPLER_MIPMAP_MODE_NEAREST)
-            .AddressModeU(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER)
-            .AddressModeV(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER)
-            .AddressModeW(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER)
-            .CompareOp(VK_COMPARE_OP_GREATER)
-            .CompareEnable(VK_TRUE)
-            .BorderColor(VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK)
-            .UnnormalizedCoordinates(VK_FALSE)
-            .MaxAnisotropy(1.0f)
-            .AnisotropyEnable(VK_FALSE)
-            .MinLod(-10000.0f)
-            .MaxLod(10000.0f)
-            .MipLodBias(0.0f);
-    }
-
 }

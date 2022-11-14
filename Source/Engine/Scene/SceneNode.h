@@ -1,78 +1,96 @@
 #pragma once
 
-#include "Component/transform.h"
+#include "Component/Transform.h"
 
-namespace flower
+namespace Flower
 {
     class Scene;
 
     class SceneNode : public std::enable_shared_from_this<SceneNode>
     {
         friend Scene;
-
     private:
-        size_t      m_id; // id of scene node.
-        size_t      m_depth = 0; // the scene node depth of the scene tree.
-
-        std::string m_name  = "SceneNode"; // inspector name.
-
-        // reference of parent.
-        std::weak_ptr<SceneNode> m_parent;
-
-        // reference of scene.
-        std::weak_ptr<Scene> m_scene;
-
-        // owner of transform.
-        std::shared_ptr<Transform> m_transform;
-
-        // owner of components without transform type.
-        std::unordered_map<const char*, std::shared_ptr<Component>> m_components;
-
-        // owner of children.
-        std::vector<std::shared_ptr<SceneNode>> m_children;
-
-    public:
-        // don't call this gay. this one just use for cereal, use SceneNode::create.
         SceneNode() = default;
 
-        // don't call this gay. this one just use for cereal, use SceneNode::create.
-        SceneNode(const size_t id, const std::string & name);
+    private:
+        bool m_bVisibility = true;
+        bool m_bStatic = true;
 
-        static std::shared_ptr<SceneNode> create(const size_t id, const std::string& name, std::weak_ptr<Scene> scene);
+        // Id of scene node.
+        size_t m_id;
+
+        std::string m_runTimeIdName;
+
+        // The scene node depth of the scene tree.
+        size_t m_depth = 0; 
+
+        // Inspector name.
+        std::string m_name  = "SceneNode"; 
+
+        // Reference of parent.
+        std::weak_ptr<SceneNode> m_parent;
+
+        // Reference of scene.
+        std::weak_ptr<Scene> m_scene;
+
+        // Owner of components.
+        std::unordered_map<const char*, std::shared_ptr<Component>> m_components;
+
+        // Owner of children.
+        std::vector<std::shared_ptr<SceneNode>> m_children;
+
+    private:
+        void setVisibilityImpl(bool bState, bool bForce);
+        void setStaticImpl(bool bState, bool bForce);
+
+    public:
+        bool getVisibility() const { return m_bVisibility; }
+        bool getStatic() const { return m_bStatic; }
+
+        void markDirty();
+
+
+        bool canSetNewVisibility();
+        bool canSetNewStatic();
+
+        void setVisibility(bool bState) { setVisibilityImpl(bState, false); }
+        void setStatic(bool bState) { setStaticImpl(bState, false); }
+
+        void tick(const RuntimeModuleTickData& tickData);
+
+        static std::shared_ptr<SceneNode> create(const size_t id, const std::string& name, std::shared_ptr<Scene> scene);
 
         virtual ~SceneNode();
 
         const auto& getId()       const { return m_id; }
+        const auto& getRuntimeIdName() const { return m_runTimeIdName; }
         const auto& getName()     const { return m_name; }
         const auto& getChildren() const { return m_children; }
+        auto& getChildren()             { return m_children; }
         const auto& getDepth()    const { return m_depth; }
-        const bool  isRoot()      const { return m_depth == 0; }
+        const bool  isRoot()      const { return m_id == 0; }
 
         std::shared_ptr<Component> getComponent(const char* id);
 
         template <typename T>
         std::shared_ptr<T> getComponent()
         {
-            // disable call getComponent<Component>().
-            // this action is no sense.
-            COMPONENT_TYPE_CHECK<T>();
-            return std::dynamic_pointer_cast<T>(getComponent(getTypeName<T>()));
+            static_assert(std::is_base_of_v<Component, T>, "T must derive from Component.");
+            return std::dynamic_pointer_cast<T>(getComponent(typeid(T).name()));
         }
 
-        std::shared_ptr<Transform> getTransform();
-
-        std::shared_ptr<SceneNode> getParent();
-       
-        std::shared_ptr<SceneNode> getPtr();
-
-        std::weak_ptr<Scene> getSceneReference() const;
+        auto getTransform() { return getComponent<Transform>(); }
+        auto getParent() { return m_parent.lock(); }
+        auto getPtr() { return shared_from_this(); }
+        auto getScene()  { return m_scene.lock(); }
 
         bool hasComponent(const char* id);
 
-        template <class T> bool hasComponent() 
+        template <class T> 
+        bool hasComponent() 
         { 
-            COMPONENT_TYPE_CHECK<T>();
-            return hasComponent(getTypeName<T>());
+            static_assert(std::is_base_of_v<Component, T>, "T must derive from Component.");
+            return hasComponent(typeid(T).name());
         }
 
         bool setName(const std::string& in);
@@ -80,43 +98,43 @@ namespace flower
         // p is the son of this node.
         bool isSon(std::shared_ptr<SceneNode> p);
 
+        // p is the direct son of this node.
+        bool isSonDirectly(std::shared_ptr<SceneNode> p);
+
+        
+
     private:
+        // Update self node depth and child's.
         void updateDepth();
 
         void addChild(std::shared_ptr<SceneNode> child);
-
-        // set parent.
-        void setParent(std::shared_ptr<SceneNode> p);
-
         void removeChild(std::shared_ptr<SceneNode> o);
         void removeChild(size_t id);
+
+        // set p as this node's new parent.
+        void setParent(std::shared_ptr<SceneNode> p);
 
         template<typename T>
         void setComponent(std::shared_ptr<T> component)
         {
-            COMPONENT_TYPE_CHECK<T>();
+            static_assert(std::is_base_of_v<Component, T>, "T must derive from Component.");
 
             component->setNode(getPtr());
-            auto it = m_components.find(component->getComponentClassName());
+            auto it = m_components.find(typeid(T).name());
             if (it != m_components.end())
             {
                 it->second = component;
             }
             else
             {
-                m_components.insert(std::make_pair(component->getComponentClassName(), component));
+                m_components.insert(std::make_pair(typeid(T).name(), component));
             }
         }
 
+        // Delete this node.
         void selfDelete();
 
         // remove component.
-        template<class T>
-        void removeComponent()
-        {
-            // all component will override getComponentStaticName, so this is also a check.
-            COMPONENT_TYPE_CHECK<T>();
-            m_components.erase(T::getComponentStaticName());
-        }
+        void removeComponent(const char* type);
     };
 }

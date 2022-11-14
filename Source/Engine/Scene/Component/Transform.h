@@ -1,20 +1,21 @@
 #pragma once
 #include "../Component.h"
-#include "../../Core/Core.h"
 
-namespace flower
+namespace Flower
 {
 	class SceneNode;
 
 	class Transform : public Component
 	{
-		friend class Scene;
-
 	public:
 		Transform() = default;
-		COMPONENT_NAME_OVERRIDE(Transform);
-
 		virtual ~Transform() = default;
+
+		Transform(std::shared_ptr<SceneNode> sceneNode)
+			: Component(sceneNode)
+		{
+
+		}
 
 	private:
 		// need update?
@@ -28,13 +29,16 @@ namespace flower
 		glm::mat4 m_worldMatrix = glm::mat4(1.0);
 		glm::mat4 m_prevWorldMatrix = glm::mat4(1.0);
 
-	private:
-		void updateWorldTransform();
+	public:
+		virtual void tick(const RuntimeModuleTickData& tickData) override;
 
 	public:
 		// getter
+		glm::vec3& getTranslation();
 		const glm::vec3& getTranslation() const;
+		glm::quat& getRotation();
 		const glm::quat& getRotation() const;
+		glm::vec3& getScale();
 		const glm::vec3& getScale() const;
 
 		// get local matrix, no relate to parent. 
@@ -52,6 +56,9 @@ namespace flower
 		// get final world matrix. relate to parent.
 		glm::mat4 getWorldMatrix();
 
+		// get last tick world matrix result.
 		glm::mat4 getPrevWorldMatrix();
+
+		void updateWorldTransform();
 	};
 }

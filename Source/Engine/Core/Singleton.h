@@ -1,21 +1,21 @@
 #pragma once
 
-namespace flower 
+namespace Flower
 {
 	template <typename T>
 	class Singleton
 	{
-	private: 
+	private:
 		Singleton() { }
 		Singleton(const Singleton& rhs) { }
 		Singleton& operator= (const Singleton& rhs) { }
 
 	public:
-		static T* getInstance()
+		static T* get()
 		{
-			// after c++ 11 is thread safe.
-			static T s { };
-			return &s;
+			// After c++ 11 this process is thread safe.
+			static T singleton{ };
+			return &singleton;
 		}
 	};
 }

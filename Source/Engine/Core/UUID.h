@@ -1,10 +1,12 @@
 #pragma once
-#include <string>
+#include "../Pch.h"
 
-namespace flower
+namespace Flower
 {
 	using UUID = std::string;
-	constexpr auto UNVALID_UUID = "";
 
-	extern std::string getUUID();
+	inline UUID buildUUID()
+	{
+		return uuids::to_string(uuids::uuid_system_generator{}());
+	}
 }

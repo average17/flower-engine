@@ -1,51 +1,44 @@
+#include "Pch.h"
 #include "ImGuiPass.h"
-#include "../Core/WindowData.h"
 
-#include <ImGui/ImGui.h>
-#include <ImGui/ImGuiGlfw.h>
-#include <ImGui/ImGuiVulkan.h>
-
-namespace flower
+namespace Flower
 {
-	static void checkVkResult(VkResult err)
-	{
-		if (err == 0)
-			return;
-		fprintf(stderr, "[imgui - vulkan] Error: VkResult = %d\n", err);
-		if (err < 0)
-			abort();
-	}
-
 	void setupVulkanInitInfo(ImGui_ImplVulkan_InitInfo* inout, VkDescriptorPool pool)
 	{
 		inout->Instance = RHI::get()->getInstance();
-		inout->PhysicalDevice = RHI::get()->getVulkanDevice()->physicalDevice;
-		inout->Device = RHI::get()->getDevice();
-		inout->QueueFamily = RHI::get()->getVulkanDevice()->findQueueFamilies().graphicsFamily;
-		inout->Queue = RHI::get()->getGraphicsQueue();
+		inout->PhysicalDevice = RHI::GPU;
+		inout->Device = RHI::Device;
+		inout->QueueFamily = RHI::get()->getGraphiscFamily();
+		inout->Queue = RHI::get()->getMajorGraphicsQueue();
 		inout->PipelineCache = VK_NULL_HANDLE;
 		inout->DescriptorPool = pool;
 		inout->Allocator = nullptr;
 		inout->MinImageCount = (uint32_t)RHI::get()->getSwapchainImageViews().size();
 		inout->ImageCount = inout->MinImageCount;
 		inout->MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-		inout->CheckVkResultFn = checkVkResult;
+		inout->CheckVkResultFn = RHICheck;
 		inout->Subpass = 0;
 	}
 
+	//
+
+
 	void ImguiPass::renderpassBuild()
 	{
+		vkDeviceWaitIdle(RHI::Device);
+
 		// Create the Render Pass
+		if(this->m_renderResource.renderPass == VK_NULL_HANDLE)
 		{
 			VkAttachmentDescription attachment = {};
-			attachment.format = RHI::get()->getSwapchainFormat();
+			attachment.format = m_drawUIFormat;
 			attachment.samples = VK_SAMPLE_COUNT_1_BIT;
 			attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 			attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+			attachment.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; // Blit to back buffer.
 
 			VkAttachmentReference color_attachment = {};
 			color_attachment.attachment = 0;
@@ -72,7 +65,29 @@ namespace flower
 			info.pSubpasses = &subpass;
 			info.dependencyCount = 1;
 			info.pDependencies = &dependency;
-			vkCheck(vkCreateRenderPass(RHI::get()->getDevice(), &info, nullptr, &this->m_gpuResource.renderPass));
+			RHICheck(vkCreateRenderPass(RHI::Device, &info, nullptr, &this->m_renderResource.renderPass));
+		}
+
+		{
+			VkImageCreateInfo info{};
+			info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+			info.flags = 0;
+			info.imageType = VK_IMAGE_TYPE_2D;
+			info.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+			info.extent.width = RHI::get()->getSwapchainExtent().width;
+			info.extent.height = RHI::get()->getSwapchainExtent().height;
+			info.extent.depth = 1;
+			info.mipLevels = 1;
+			info.samples = VK_SAMPLE_COUNT_1_BIT;
+			info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+			info.arrayLayers = 1;
+			info.tiling = VK_IMAGE_TILING_OPTIMAL;
+			info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			info.queueFamilyIndexCount = 0;
+			info.pQueueFamilyIndices = nullptr;
+			info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+			m_drawUIImages = VulkanImage::create("DrawUIImage", info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		}
 
 		// Create Framebuffer & CommandBuffer
@@ -80,7 +95,7 @@ namespace flower
 			VkImageView attachment[1];
 			VkFramebufferCreateInfo info = {};
 			info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-			info.renderPass = this->m_gpuResource.renderPass;
+			info.renderPass = this->m_renderResource.renderPass;
 			info.attachmentCount = 1;
 			info.pAttachments = attachment;
 			info.width = RHI::get()->getSwapchainExtent().width;
@@ -88,14 +103,14 @@ namespace flower
 			info.layers = 1;
 
 			auto backBufferSize = RHI::get()->getSwapchainImageViews().size();
-			m_gpuResource.framebuffers.resize(backBufferSize);
-			m_gpuResource.commandPools.resize(backBufferSize);
-			m_gpuResource.commandBuffers.resize(backBufferSize);
+			m_renderResource.framebuffers.resize(backBufferSize);
+			m_renderResource.commandPools.resize(backBufferSize);
+			m_renderResource.commandBuffers.resize(backBufferSize);
 
 			for (uint32_t i = 0; i < backBufferSize; i++)
 			{
-				attachment[0] = RHI::get()->getSwapchainImageViews()[i];
-				vkCheck(vkCreateFramebuffer(RHI::get()->getDevice(), &info, nullptr, &m_gpuResource.framebuffers[i]));
+				attachment[0] = m_drawUIImages->getView(buildBasicImageSubresource());
+				RHICheck(vkCreateFramebuffer(RHI::Device, &info, nullptr, &m_renderResource.framebuffers[i]));
 			}
 
 			for (uint32_t i = 0; i < backBufferSize; i++)
@@ -105,47 +120,48 @@ namespace flower
 					VkCommandPoolCreateInfo info = {};
 					info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 					info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-					info.queueFamilyIndex = RHI::get()->getVulkanDevice()->findQueueFamilies().graphicsFamily;
-					vkCheck(vkCreateCommandPool(RHI::get()->getDevice(), &info, nullptr, &m_gpuResource.commandPools[i]));
+					info.queueFamilyIndex = RHI::get()->getGraphiscFamily();
+					RHICheck(vkCreateCommandPool(RHI::Device, &info, nullptr, &m_renderResource.commandPools[i]));
 				}
 
 				// Command buffer
 				{
 					VkCommandBufferAllocateInfo info = {};
 					info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-					info.commandPool = m_gpuResource.commandPools[i];
+					info.commandPool = m_renderResource.commandPools[i];
 					info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 					info.commandBufferCount = 1;
-					vkCheck(vkAllocateCommandBuffers(RHI::get()->getDevice(), &info, &m_gpuResource.commandBuffers[i]));
+					RHICheck(vkAllocateCommandBuffers(RHI::Device, &info, &m_renderResource.commandBuffers[i]));
 				}
 			}
 		}
 	}
 
-	void ImguiPass::renderpassRelease()
+	void ImguiPass::renderpassRelease(bool bFullRelease)
 	{
-		vkDestroyRenderPass(RHI::get()->getDevice(),m_gpuResource.renderPass,nullptr);
+		vkDeviceWaitIdle(RHI::Device);
 
-		auto backBufferSize = m_gpuResource.framebuffers.size();
-		for (uint32_t i = 0; i < backBufferSize; i++)
+		if (bFullRelease)
 		{
-			vkFreeCommandBuffers(RHI::get()->getDevice(),m_gpuResource.commandPools[i],1,&m_gpuResource.commandBuffers[i]);
-			vkDestroyCommandPool(RHI::get()->getDevice(),m_gpuResource.commandPools[i],nullptr);
-			vkDestroyFramebuffer(RHI::get()->getDevice(),m_gpuResource.framebuffers[i],nullptr);
+			vkDestroyRenderPass(RHI::Device, m_renderResource.renderPass, nullptr);
 		}
 
-		m_gpuResource.framebuffers.resize(0);
-		m_gpuResource.commandPools.resize(0);
-		m_gpuResource.commandBuffers.resize(0);
+		
+		auto backBufferSize = m_renderResource.framebuffers.size();
+		for (uint32_t i = 0; i < backBufferSize; i++)
+		{
+			vkFreeCommandBuffers(RHI::Device, m_renderResource.commandPools[i], 1, &m_renderResource.commandBuffers[i]);
+			vkDestroyCommandPool(RHI::Device, m_renderResource.commandPools[i], nullptr);
+			vkDestroyFramebuffer(RHI::Device, m_renderResource.framebuffers[i], nullptr);
+		}
+
+		m_renderResource.framebuffers.resize(0);
+		m_renderResource.commandPools.resize(0);
+		m_renderResource.commandBuffers.resize(0);
 	}
 
 	void ImguiPass::init()
 	{
-		if(m_bInit)
-		{
-			return;
-		}
-
 		// Descriptor pool prepare.
 		{
 			VkDescriptorPoolSize pool_sizes[] =
@@ -169,65 +185,59 @@ namespace flower
 			pool_info.maxSets = 1000 * IM_ARRAYSIZE(pool_sizes);
 			pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
 			pool_info.pPoolSizes = pool_sizes;
-			vkCheck(vkCreateDescriptorPool(RHI::get()->getDevice(), &pool_info, nullptr, &m_gpuResource.descriptorPool));
+			RHICheck(vkCreateDescriptorPool(RHI::Device, &pool_info, nullptr, &m_renderResource.descriptorPool));
 		}
 
 		renderpassBuild();
 
 		// register swapchain rebuild functions.
-		bool res0 = RHI::get()->onBeforeSwapchainRebuild.registerFunction(
-			onBeforeSwapChainRebuildName,[&]() { renderpassRelease(); });
-		bool res1 = RHI::get()->onAfterSwapchainRebuild.registerFunction(
-			onAfterSwapChainRebuildName,[&]() { renderpassBuild(); });
-		CHECK(res0 && res1 && "fail to register swapchain rebuild callbacks.");
+		m_beforeSwapChainRebuildHandle = RHI::get()->onBeforeSwapchainRecreate.addLambda([&]() { renderpassRelease(false); });
+		m_afterSwapChainRebuildHandle = RHI::get()->onAfterSwapchainRecreate.addLambda([&]() { renderpassBuild(); });
 
 		// init vulkan resource.
 		ImGui_ImplVulkan_InitInfo vkInitInfo{ };
-		setupVulkanInitInfo(&vkInitInfo,  m_gpuResource.descriptorPool);
+		setupVulkanInitInfo(&vkInitInfo, m_renderResource.descriptorPool);
 
 		// init vulkan here.
-		ImGui_ImplVulkan_Init(&vkInitInfo,m_gpuResource.renderPass);
+		ImGui_ImplVulkan_Init(&vkInitInfo, m_renderResource.renderPass);
 
 		// upload font texture to gpu.
 		{
-			VkCommandPool command_pool = m_gpuResource.commandPools[0];
-			VkCommandBuffer command_buffer = m_gpuResource.commandBuffers[0];
-			vkCheck(vkResetCommandPool(RHI::get()->getDevice(), command_pool, 0));
+			VkCommandPool command_pool = m_renderResource.commandPools[0];
+			VkCommandBuffer command_buffer = m_renderResource.commandBuffers[0];
+			RHICheck(vkResetCommandPool(RHI::Device, command_pool, 0));
 			VkCommandBufferBeginInfo begin_info = {};
 			begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 			begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-			vkCheck(vkBeginCommandBuffer(command_buffer, &begin_info));
+			RHICheck(vkBeginCommandBuffer(command_buffer, &begin_info));
 			ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
 			VkSubmitInfo end_info = {};
 			end_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			end_info.commandBufferCount = 1;
 			end_info.pCommandBuffers = &command_buffer;
-			vkCheck(vkEndCommandBuffer(command_buffer));
-			vkCheck(vkQueueSubmit(vkInitInfo.Queue, 1, &end_info, VK_NULL_HANDLE));
-			vkCheck(vkDeviceWaitIdle(vkInitInfo.Device));
+			RHICheck(vkEndCommandBuffer(command_buffer));
+			RHICheck(vkQueueSubmit(vkInitInfo.Queue, 1, &end_info, VK_NULL_HANDLE));
+			RHICheck(vkDeviceWaitIdle(vkInitInfo.Device));
 			ImGui_ImplVulkan_DestroyFontUploadObjects();
 		}
-
-		m_bInit = true;
 	}
 
 	void ImguiPass::renderFrame(uint32_t backBufferIndex)
 	{
-		ImGui::Render();
 		ImDrawData* main_draw_data = ImGui::GetDrawData();
 		{
-			vkCheck(vkResetCommandPool(RHI::get()->getDevice(), m_gpuResource.commandPools[backBufferIndex], 0));
+			RHICheck(vkResetCommandPool(RHI::Device, m_renderResource.commandPools[backBufferIndex], 0));
 			VkCommandBufferBeginInfo info = {};
 			info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 			info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-			vkCheck(vkBeginCommandBuffer(m_gpuResource.commandBuffers[backBufferIndex], &info));
-			setPerfMarkerBegin(m_gpuResource.commandBuffers[backBufferIndex], "ImGUI", {1.0f, 1.0f, 0.0f, 1.0f});
+			RHICheck(vkBeginCommandBuffer(m_renderResource.commandBuffers[backBufferIndex], &info));
+			RHI::setPerfMarkerBegin(m_renderResource.commandBuffers[backBufferIndex], "ImGUI", { 1.0f, 1.0f, 0.0f, 1.0f });
 		}
 		{
 			VkRenderPassBeginInfo info = {};
 			info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-			info.renderPass = m_gpuResource.renderPass;
-			info.framebuffer = m_gpuResource.framebuffers[backBufferIndex];
+			info.renderPass = m_renderResource.renderPass;
+			info.framebuffer = m_renderResource.framebuffers[backBufferIndex];
 			info.renderArea.extent.width = RHI::get()->getSwapchainExtent().width;
 			info.renderArea.extent.height = RHI::get()->getSwapchainExtent().height;
 			info.clearValueCount = 1;
@@ -238,35 +248,98 @@ namespace flower
 			clearColor.color.float32[2] = m_clearColor.z * m_clearColor.w;
 			clearColor.color.float32[3] = m_clearColor.w;
 			info.pClearValues = &clearColor;
-			vkCmdBeginRenderPass(m_gpuResource.commandBuffers[backBufferIndex], &info, VK_SUBPASS_CONTENTS_INLINE);
+			vkCmdBeginRenderPass(m_renderResource.commandBuffers[backBufferIndex], &info, VK_SUBPASS_CONTENTS_INLINE);
 		}
 
-		ImGui_ImplVulkan_RenderDrawData(main_draw_data, m_gpuResource.commandBuffers[backBufferIndex]);
+		ImGui_ImplVulkan_RenderDrawData(main_draw_data, m_renderResource.commandBuffers[backBufferIndex]);
 
-		vkCmdEndRenderPass(m_gpuResource.commandBuffers[backBufferIndex]);
-		setPerfMarkerEnd(m_gpuResource.commandBuffers[backBufferIndex]);
+		vkCmdEndRenderPass(m_renderResource.commandBuffers[backBufferIndex]);
+		RHI::setPerfMarkerEnd(m_renderResource.commandBuffers[backBufferIndex]);
 
-		vkEndCommandBuffer(m_gpuResource.commandBuffers[backBufferIndex]);
+		VkImageMemoryBarrier barrier{};
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.image = RHI::get()->getSwapchainImages().at(backBufferIndex);
+		barrier.subresourceRange = buildBasicImageSubresource();
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		vkCmdPipelineBarrier(
+			m_renderResource.commandBuffers[backBufferIndex],
+			VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			{},
+			0,
+			nullptr,
+			0,
+			nullptr,
+			1,
+			&barrier
+		);
+
+		VkImageSubresourceLayers copyLayer
+		{
+			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.mipLevel = 0,
+			.baseArrayLayer = 0,
+			.layerCount = 1,
+		};
+
+		VkImageBlit copyRegion
+		{
+			.srcSubresource = copyLayer,
+			.dstSubresource = copyLayer,
+		};
+
+		copyRegion.srcOffsets[0] = { 0, 0, 0};
+		copyRegion.dstOffsets[0] = copyRegion.srcOffsets[0];
+
+		copyRegion.srcOffsets[1] = { (int)m_drawUIImages.get()->getExtent().width, (int)m_drawUIImages.get()->getExtent().height, 1};
+		copyRegion.dstOffsets[1] = copyRegion.srcOffsets[1];
+
+		vkCmdBlitImage(m_renderResource.commandBuffers[backBufferIndex], 
+			m_drawUIImages->getImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			RHI::get()->getSwapchainImages().at(backBufferIndex), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion, VK_FILTER_NEAREST);
+
+
+		barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; 
+
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+		vkCmdPipelineBarrier(
+			m_renderResource.commandBuffers[backBufferIndex],
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			{},
+			0,
+			nullptr,
+			0,
+			nullptr,
+			1,
+			&barrier
+		);
+
+		// VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+
+		// VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+
+		RHICheck(vkEndCommandBuffer(m_renderResource.commandBuffers[backBufferIndex]));
 	}
 
 	void ImguiPass::release()
 	{
-		if(!m_bInit)
-		{
-			return;
-		}
-
 		// unregister swapchain rebuild functions.
-		bool res0 = RHI::get()->onBeforeSwapchainRebuild.unregisterFunction(onBeforeSwapChainRebuildName);
-		bool res1 = RHI::get()->onAfterSwapchainRebuild.unregisterFunction(onAfterSwapChainRebuildName);
+		bool res0 = RHI::get()->onBeforeSwapchainRecreate.remove(m_beforeSwapChainRebuildHandle);
+		bool res1 = RHI::get()->onAfterSwapchainRecreate.remove(m_afterSwapChainRebuildHandle);
 		CHECK(res0 && res1 && "fail to unregister swapchain rebuild callbacks.");
 
 		// shut down vulkan here.
 		ImGui_ImplVulkan_Shutdown();
 
-		renderpassRelease();
-		vkDestroyDescriptorPool(RHI::get()->getDevice(), m_gpuResource.descriptorPool, nullptr);
-
-		m_bInit = false;
+		renderpassRelease(true);
+		vkDestroyDescriptorPool(RHI::Device, m_renderResource.descriptorPool, nullptr);
 	}
 }

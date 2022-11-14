@@ -1,45 +1,36 @@
 #pragma once
-#include "Device.h"
-#include <glfw/glfw3.h>
+#include "RHICommon.h"
 
-namespace flower
+namespace Flower
 {
-	class VulkanSwapchain
+	class Swapchain
 	{
 	private:
-		VulkanDevice* m_device  = nullptr;
-		VkSurfaceKHR* m_surface = nullptr;
-		GLFWwindow*   m_window  = nullptr;
 		std::vector<VkImage> m_swapchainImages = {};
 		std::vector<VkImageView> m_swapchainImageViews = {};
 		VkFormat m_swapchainImageFormat = {};
 		VkExtent2D m_swapchainExtent = {};
 		VkSwapchainKHR m_swapchain = {};
-		bool m_bOk = false;
 
 	private:
-		void createSwapchain();
-		VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats); 
+		VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 		VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 		VkExtent2D chooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 
 	public:
-		VulkanSwapchain() = default;
-		~VulkanSwapchain();
-		operator VkSwapchainKHR()
-		{
-			return m_swapchain;
-		}
+		inline auto get() const { return m_swapchain; }
 
-		void init(VulkanDevice* in_device,VkSurfaceKHR* in_surface,GLFWwindow* in_window);
-		void destroy();
-		const VkExtent2D& getSwapchainExtent() const { return m_swapchainExtent; }
-		auto& getImages() { return m_swapchainImages; }
-		VulkanDevice* getDevice() { return m_device; }
-		const VkFormat& getSwapchainImageFormat() const { return m_swapchainImageFormat;}
-		std::vector<VkImageView>& getImageViews() { return m_swapchainImageViews; }
-		VkSwapchainKHR& getInstance(){ return m_swapchain;}
+		inline auto& getImages() { return m_swapchainImages; }
+		inline const auto& getImages() const { return m_swapchainImages; }
+		inline auto& getImageViews() { return m_swapchainImageViews; }
+		inline const auto& getImageViews() const { return m_swapchainImageViews; }
 
-		void rebuildSwapchain();
+		inline auto getExtent() const { return m_swapchainExtent; }
+		inline auto getImageFormat() const { return m_swapchainImageFormat; }
+
+	public:
+		void init();
+		void rebuild();
+		void release();
 	};
 }

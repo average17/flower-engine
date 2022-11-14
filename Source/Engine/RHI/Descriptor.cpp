@@ -1,39 +1,35 @@
-#include "Descriptor.h"
+#include "Pch.h"
 #include "RHI.h"
-#include <algorithm>
+#include "Descriptor.h"
 
-namespace flower
+namespace Flower
 {
-    VkDescriptorPool createPool(
-        VkDevice m_device,
-        const VulkanDescriptorAllocator::PoolSizes& poolSizes,
-        int32_t count,
-        VkDescriptorPoolCreateFlags flags)
+    VkDescriptorPool createPool(const DescriptorAllocator::PoolSizes& poolSizes, int32_t count, VkDescriptorPoolCreateFlags flags)
     {
         std::vector<VkDescriptorPoolSize> sizes;
         sizes.reserve(poolSizes.sizes.size());
-        for(auto sz : poolSizes.sizes)
+        for (const auto& sz : poolSizes.sizes)
         {
-            sizes.push_back({ sz.first, uint32_t( sz.second * count)});
+            sizes.push_back({ sz.first, uint32_t(sz.second * count) });
         }
 
-        VkDescriptorPoolCreateInfo pool_info = {};
-        pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        pool_info.flags = flags;
-        pool_info.maxSets = count;
-        pool_info.poolSizeCount = (uint32_t)sizes.size();
-        pool_info.pPoolSizes = sizes.data();
+        VkDescriptorPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.flags = flags;
+        poolInfo.maxSets = count;
+        poolInfo.poolSizeCount = (uint32_t)sizes.size();
+        poolInfo.pPoolSizes = sizes.data();
 
         VkDescriptorPool descriptorPool;
-        vkCheck(vkCreateDescriptorPool(m_device,&pool_info,nullptr,&descriptorPool));
+        RHICheck(vkCreateDescriptorPool(RHI::Device, &poolInfo, nullptr, &descriptorPool));
         return descriptorPool;
     }
 
-    void VulkanDescriptorAllocator::resetPools()
+    void DescriptorAllocator::resetPools()
     {
-        for(auto p: m_usedPools)
+        for (auto p : m_usedPools)
         {
-            vkResetDescriptorPool(*m_device,p,0);
+            vkResetDescriptorPool(RHI::Device, p, 0);
         }
 
         m_freePools = m_usedPools;
@@ -41,10 +37,10 @@ namespace flower
         m_currentPool = VK_NULL_HANDLE;
     }
 
-    bool VulkanDescriptorAllocator::allocate(VkDescriptorSet* set,VkDescriptorSetLayout layout)
+    bool DescriptorAllocator::allocate(VkDescriptorSet* set, VkDescriptorSetLayout layout)
     {
         // when current working pool is null then request new.
-        if(m_currentPool == VK_NULL_HANDLE)
+        if (m_currentPool == VK_NULL_HANDLE)
         {
             m_currentPool = requestPool();
             m_usedPools.push_back(m_currentPool);
@@ -56,10 +52,10 @@ namespace flower
         allocInfo.pSetLayouts = &layout;
         allocInfo.descriptorPool = m_currentPool;
         allocInfo.descriptorSetCount = 1;
-        VkResult allocResult = vkAllocateDescriptorSets(*m_device,&allocInfo,set);
+        VkResult allocResult = vkAllocateDescriptorSets(RHI::Device, &allocInfo, set);
         bool needReallocate = false;
 
-        switch(allocResult)
+        switch (allocResult)
         {
         case VK_SUCCESS:
             return true;
@@ -69,47 +65,47 @@ namespace flower
             needReallocate = true;
             break;
         default:
-            LOG_GRAPHICS_ERROR("Allocate descriptor pool error!");
+            LOG_RHI_ERROR("Allocate descriptor pool error!");
             return false;
         }
 
-        if(needReallocate)
+        if (needReallocate)
         {
             m_currentPool = requestPool();
             m_usedPools.push_back(m_currentPool);
             allocInfo.descriptorPool = m_currentPool;
-            allocResult = vkAllocateDescriptorSets(*m_device,&allocInfo,set);
-            if(allocResult == VK_SUCCESS)
+            allocResult = vkAllocateDescriptorSets(RHI::Device, &allocInfo, set);
+            if (allocResult == VK_SUCCESS)
             {
                 return true;
             }
         }
 
-        LOG_GRAPHICS_ERROR("Allocate descriptor pool error!");
+        LOG_RHI_ERROR("Allocate descriptor pool error!");
         return false;
     }
 
-    void VulkanDescriptorAllocator::init(VulkanDevice* newDevice)
+    void DescriptorAllocator::init()
     {
-        m_device = newDevice;
+
     }
 
-    void VulkanDescriptorAllocator::cleanup()
+    void DescriptorAllocator::release()
     {
         resetPools();
-        for(auto p : m_freePools)
+        for (auto p : m_freePools)
         {
-            vkDestroyDescriptorPool(*m_device,p,nullptr);
+            vkDestroyDescriptorPool(RHI::Device, p, nullptr);
         }
-        for(auto p : m_usedPools)
+        for (auto p : m_usedPools)
         {
-            vkDestroyDescriptorPool(*m_device,p,nullptr);
+            vkDestroyDescriptorPool(RHI::Device, p, nullptr);
         }
     }
 
-    VkDescriptorPool VulkanDescriptorAllocator::requestPool()
+    VkDescriptorPool DescriptorAllocator::requestPool()
     {
-        if(m_freePools.size() > 0)
+        if (m_freePools.size() > 0)
         {
             VkDescriptorPool pool = m_freePools.back();
             m_freePools.pop_back();
@@ -117,17 +113,17 @@ namespace flower
         }
         else
         {
-            return createPool(*m_device,m_descriptorSizes,1000,0); 
+            return createPool(m_descriptorSizes, 1000, 0);
         }
     }
 
 
-    void VulkanDescriptorLayoutCache::init(VulkanDevice* newDevice)
+    void DescriptorLayoutCache::init()
     {
-        m_device = newDevice;
+
     }
 
-    VkDescriptorSetLayout VulkanDescriptorLayoutCache::createDescriptorLayout(VkDescriptorSetLayoutCreateInfo* info)
+    VkDescriptorSetLayout DescriptorLayoutCache::createDescriptorLayout(VkDescriptorSetLayoutCreateInfo* info)
     {
         DescriptorLayoutInfo layoutinfo;
         layoutinfo.bindings.reserve(info->bindingCount);
@@ -135,10 +131,10 @@ namespace flower
         int32_t lastBinding = -1;
 
         // fill DescriptorLayoutInfo
-        for(uint32_t i = 0; i < info->bindingCount; i++)
+        for (uint32_t i = 0; i < info->bindingCount; i++)
         {
             layoutinfo.bindings.push_back(info->pBindings[i]);
-            if(static_cast<int32_t>(info->pBindings[i].binding) > lastBinding)
+            if (static_cast<int32_t>(info->pBindings[i].binding) > lastBinding)
             {
                 lastBinding = info->pBindings[i].binding;
             }
@@ -149,9 +145,9 @@ namespace flower
         }
 
         // sort first.
-        if(!isSorted)
+        if (!isSorted)
         {
-            std::sort(layoutinfo.bindings.begin(),layoutinfo.bindings.end(),[](VkDescriptorSetLayoutBinding& a,VkDescriptorSetLayoutBinding& b)
+            std::sort(layoutinfo.bindings.begin(), layoutinfo.bindings.end(), [](VkDescriptorSetLayoutBinding& a, VkDescriptorSetLayoutBinding& b)
             {
                 return a.binding < b.binding;
             });
@@ -159,48 +155,61 @@ namespace flower
 
         // perpare VkDescriptorSetLayout
         auto it = m_layoutCache.find(layoutinfo);
-        if(it != m_layoutCache.end())
+        if (it != m_layoutCache.end())
         {
             return (*it).second;
         }
         else
         {
             VkDescriptorSetLayout layout;
-            vkCreateDescriptorSetLayout(*m_device,info,nullptr,&layout);
+            vkCreateDescriptorSetLayout(RHI::Device, info, nullptr, &layout);
             m_layoutCache[layoutinfo] = layout;
             return layout;
         }
     }
 
-    void VulkanDescriptorLayoutCache::cleanup()
+    void DescriptorLayoutCache::release()
     {
-        for(auto pair : m_layoutCache)
+        for (auto& pair : m_layoutCache)
         {
-            vkDestroyDescriptorSetLayout(*m_device,pair.second,nullptr);
+            vkDestroyDescriptorSetLayout(RHI::Device, pair.second, nullptr);
         }
         m_layoutCache.clear();
     }
 
-    VulkanDescriptorFactory VulkanDescriptorFactory::begin(VulkanDescriptorLayoutCache* layoutCache,VulkanDescriptorAllocator* allocator)
+    bool DescriptorLayoutCache::DescriptorLayoutInfo::operator==(const DescriptorLayoutInfo& other) const
     {
-        VulkanDescriptorFactory builder;
+        return other.hash() == hash();
+    }
+
+    size_t DescriptorLayoutCache::DescriptorLayoutInfo::hash() const
+    {
+        return CRC::Calculate(bindings.data(), bindings.size() * sizeof(VkDescriptorSetLayoutBinding), CRC::CRC_32());
+    }
+
+    DescriptorFactory DescriptorFactory::begin(DescriptorLayoutCache* layoutCache, DescriptorAllocator* allocator)
+    {
+        DescriptorFactory builder;
         builder.m_cache = layoutCache;
         builder.m_allocator = allocator;
         return builder;
     }
 
-    VulkanDescriptorFactory& VulkanDescriptorFactory::bindBuffer(
+    DescriptorFactory& DescriptorFactory::bindBuffers(
         uint32_t binding,
+        uint32_t count,
         VkDescriptorBufferInfo* bufferInfo,
         VkDescriptorType type,
         VkShaderStageFlags stageFlags)
     {
         VkDescriptorSetLayoutBinding newBinding{};
-        newBinding.descriptorCount = 1;
+
+        newBinding.descriptorCount = count;
         newBinding.descriptorType = type;
         newBinding.pImmutableSamplers = nullptr;
         newBinding.stageFlags = stageFlags;
         newBinding.binding = binding;
+
         m_bindings.push_back(newBinding);
 
         DescriptorWriteContainer descriptorWrite{};
@@ -208,40 +217,13 @@ namespace flower
         descriptorWrite.bufInfo = bufferInfo;
         descriptorWrite.type = type;
         descriptorWrite.binding = binding;
-        descriptorWrite.count = 1;
+        descriptorWrite.count = count;
         m_descriptorWriteBufInfos.push_back(descriptorWrite);
 
         return *this;
     }
 
-    VulkanDescriptorFactory& VulkanDescriptorFactory::bindImage(
-        uint32_t binding,
-        VkDescriptorImageInfo* info,
-        VkDescriptorType type,
-        VkShaderStageFlags stageFlags)
-    {
-        VkDescriptorSetLayoutBinding newBinding{};
-
-        newBinding.descriptorCount = 1;
-        newBinding.descriptorType = type;
-        newBinding.pImmutableSamplers = nullptr;
-        newBinding.stageFlags = stageFlags;
-        newBinding.binding = binding;
-
-        m_bindings.push_back(newBinding);
-
-        DescriptorWriteContainer descriptorWrite{};
-        descriptorWrite.isImg = true;
-        descriptorWrite.imgInfo = info;
-        descriptorWrite.type = type;
-        descriptorWrite.binding = binding;
-        descriptorWrite.count = 1;
-        m_descriptorWriteBufInfos.push_back(descriptorWrite);
-
-        return *this;
-    }
-
-    VulkanDescriptorFactory& VulkanDescriptorFactory::bindImages(
+    DescriptorFactory& DescriptorFactory::bindImages(
         uint32_t binding,
         uint32_t count,
         VkDescriptorImageInfo* info,
@@ -264,75 +246,79 @@ namespace flower
         descriptorWrite.type = type;
         descriptorWrite.binding = binding;
         descriptorWrite.count = count;
+
         m_descriptorWriteBufInfos.push_back(descriptorWrite);
 
         return *this;
     }
 
-    bool VulkanDescriptorFactory::build(VulkanDescriptorSetReference& set,VulkanDescriptorLayoutReference& layout)
+    DescriptorFactory& DescriptorFactory::bindNoInfo(
+        VkDescriptorType type, 
+        VkShaderStageFlags stageFlags,
+        uint32_t binding,
+        uint32_t count)
+    {
+        VkDescriptorSetLayoutBinding newBinding{};
+
+        newBinding.descriptorCount = count;
+        newBinding.descriptorType = type;
+        newBinding.pImmutableSamplers = nullptr;
+        newBinding.stageFlags = stageFlags;
+        newBinding.binding = binding;
+
+        m_bindings.push_back(newBinding);
+
+        return *this;
+    }
+
+    void DescriptorFactory::buildNoInfo(VkDescriptorSetLayout& layout, VkDescriptorSet& set)
     {
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.pNext = nullptr;
         layoutInfo.pBindings = m_bindings.data();
         layoutInfo.bindingCount = static_cast<uint32_t>(m_bindings.size());
-        layout.layout = m_cache->createDescriptorLayout(&layoutInfo);
-        bool success = m_allocator->allocate(&set.set,layout.layout);
 
-        if(!success)
+        layout = m_cache->createDescriptorLayout(&layoutInfo);
+        CHECK(m_allocator->allocate(&set, layout));
+    }
+
+    void DescriptorFactory::buildNoInfo(VkDescriptorSet& set)
+    {
+        VkDescriptorSetLayout layout;
+        return buildNoInfo(layout, set);
+    }
+
+    void DescriptorFactory::buildNoInfoPush(VkDescriptorSetLayout& layout)
+    {
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
+        layoutInfo.pBindings = m_bindings.data();
+        layoutInfo.bindingCount = static_cast<uint32_t>(m_bindings.size());
+
+        layout = m_cache->createDescriptorLayout(&layoutInfo);
+    }
+
+    bool DescriptorFactory::build(VkDescriptorSet& set, VkDescriptorSetLayout& layout)
+    {
+        VkDescriptorSet retSet;
+        VkDescriptorSetLayout retLayout;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.pBindings = m_bindings.data();
+        layoutInfo.bindingCount = static_cast<uint32_t>(m_bindings.size());
+
+        retLayout = m_cache->createDescriptorLayout(&layoutInfo);
+
+        bool success = m_allocator->allocate(&retSet, retLayout);
+        if (!success)
         {
             return false;
         };
 
         std::vector<VkWriteDescriptorSet> writes{};
-        for(auto& dc : m_descriptorWriteBufInfos)
-        {
-            VkWriteDescriptorSet newWrite{};
-            newWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            newWrite.pNext = nullptr;
-            newWrite.descriptorCount = dc.count;
-
-            newWrite.descriptorType = dc.type;
-
-            if(dc.isImg)
-                newWrite.pImageInfo = dc.imgInfo;
-            else
-                newWrite.pBufferInfo = dc.bufInfo;
-
-            newWrite.dstBinding = dc.binding;
-            newWrite.dstSet = set.set;
-            writes.push_back(newWrite);
-        }
-
-        vkUpdateDescriptorSets(*m_allocator->m_device,static_cast<uint32_t>(writes.size()),writes.data(),0,nullptr);
-        return true;
-    }
-
-    bool VulkanDescriptorFactory::build(VulkanDescriptorSetReference& set)
-    {
-        VulkanDescriptorLayoutReference layout;
-        return build(set,layout);
-    }
-
-    bool VulkanDescriptorFactory::build(VkDescriptorSet* set)
-    {
-        VulkanDescriptorLayoutReference layout;
-        VkDescriptorSetLayoutCreateInfo layoutInfo{};
-
-        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.pNext = nullptr;
-        layoutInfo.pBindings = m_bindings.data();
-        layoutInfo.bindingCount = static_cast<uint32_t>(m_bindings.size());
-        layout.layout = m_cache->createDescriptorLayout(&layoutInfo);
-        bool success = m_allocator->allocate(set,layout.layout);
-
-        if(!success)
-        {
-            return false;
-        };
-
-        std::vector<VkWriteDescriptorSet> writes{};
-        for(auto& dc : m_descriptorWriteBufInfos)
+        for (auto& dc : m_descriptorWriteBufInfos)
         {
             VkWriteDescriptorSet newWrite{};
             newWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -340,7 +326,7 @@ namespace flower
             newWrite.descriptorCount = dc.count;
             newWrite.descriptorType = dc.type;
 
-            if(dc.isImg)
+            if (dc.isImg)
             {
                 newWrite.pImageInfo = dc.imgInfo;
             }
@@ -350,59 +336,21 @@ namespace flower
             }
 
             newWrite.dstBinding = dc.binding;
-            newWrite.dstSet = *set;
+            newWrite.dstSet = retSet;
             writes.push_back(newWrite);
         }
 
-        vkUpdateDescriptorSets(*m_allocator->m_device,static_cast<uint32_t>(writes.size()),writes.data(),0,nullptr);
+        vkUpdateDescriptorSets(RHI::Device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+
+        set = retSet;
+        layout = retLayout;
+
         return true;
     }
 
-    bool VulkanDescriptorLayoutCache::DescriptorLayoutInfo::operator==(const DescriptorLayoutInfo& other) const
+    bool DescriptorFactory::build(VkDescriptorSet& set)
     {
-        if(other.bindings.size() != bindings.size())
-        {
-            return false;
-        }
-        else
-        {
-            for(int i = 0; i<bindings.size(); i++)
-            {
-                if(other.bindings[i].binding != bindings[i].binding)
-                {
-                    return false;
-                }
-                if(other.bindings[i].descriptorType != bindings[i].descriptorType)
-                {
-                    return false;
-                }
-                if(other.bindings[i].descriptorCount!=bindings[i].descriptorCount)
-                {
-                    return false;
-                }
-                if(other.bindings[i].stageFlags!=bindings[i].stageFlags)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
+        VkDescriptorSetLayout layout;
+        return build(set, layout);
     }
-
-    size_t VulkanDescriptorLayoutCache::DescriptorLayoutInfo::hash() const
-    {
-        using std::size_t;
-        using std::hash;
-
-        size_t result = hash<size_t>()(bindings.size());
-
-        for(const VkDescriptorSetLayoutBinding& b:bindings)
-        {
-            size_t binding_hash = b.binding | b.descriptorType << 8 | b.descriptorCount << 16 | b.stageFlags << 24;
-            result ^= hash<size_t>()(binding_hash);
-        }
-
-        return result;
-    }
-
 }

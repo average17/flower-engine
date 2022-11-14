@@ -1,35 +1,38 @@
 #pragma once
 #include "../RHI/RHI.h"
 
-namespace flower
+namespace Flower
 {
 	class ImguiPass
 	{
+	private:
+		bool m_bInit = false;
+		DelegateHandle m_beforeSwapChainRebuildHandle;
+		DelegateHandle m_afterSwapChainRebuildHandle;
+
 		struct ImguiPassGpuResource
 		{
 			VkDescriptorPool descriptorPool;
-			VkRenderPass renderPass;
+			VkRenderPass renderPass = VK_NULL_HANDLE;
 
 			std::vector<VkFramebuffer>   framebuffers;
 			std::vector<VkCommandPool>   commandPools;
 			std::vector<VkCommandBuffer> commandBuffers;
-		}; 
+		} m_renderResource;
+
+		glm::vec4 m_clearColor{ 0.45f, 0.55f, 0.60f, 1.00f };
 
 	private:
-		bool m_bInit = false;
-		const char* onBeforeSwapChainRebuildName = "ImGuiPassBeforeSwapchainRebuild";
-		const char* onAfterSwapChainRebuildName  = "ImGuiPassAfterSwapchainRebuild";
-		ImguiPassGpuResource m_gpuResource;
-		glm::vec4 m_clearColor { 0.45f, 0.55f, 0.60f, 1.00f};
+		const VkFormat m_drawUIFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+		std::shared_ptr<VulkanImage> m_drawUIImages;
 
-	private:
 		void renderpassBuild();
-		void renderpassRelease();
+		void renderpassRelease(bool bFullRelease);
 
 	public:
 		VkCommandBuffer getCommandBuffer(uint32_t index)
 		{
-			return m_gpuResource.commandBuffers[index];
+			return m_renderResource.commandBuffers[index];
 		}
 
 	public:
@@ -39,5 +42,5 @@ namespace flower
 		void release();
 
 		void renderFrame(uint32_t backBufferIndex);
-	}; 
+	};
 }

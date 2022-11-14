@@ -1,9 +1,12 @@
+#include "Pch.h"
 #include "Component.h"
 #include "SceneNode.h"
-namespace flower
+#include "Scene.h"
+
+namespace Flower
 {
-	Component::~Component()
+	void Component::markDirty()
 	{
-		
+		m_node.lock()->getScene()->setDirty(true);
 	}
 }

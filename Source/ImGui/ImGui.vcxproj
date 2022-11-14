@@ -45,15 +45,15 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(SolutionDir)Build\$(Platform)\$(ProjectName)$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)Build\Intermediate\$(ProjectName)$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)ThirdParty/;$(IncludePath)</IncludePath>
+    <OutDir>$(SolutionDir)Build\$(ProjectName)-$(Configuration)-Binary\</OutDir>
+    <IntDir>$(SolutionDir)Build\$(ProjectName)-$(Configuration)-Intermediate\</IntDir>
+    <IncludePath>$(SolutionDir)External/;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(SolutionDir)Build\$(Platform)\$(ProjectName)$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)Build\Intermediate\$(ProjectName)$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)ThirdParty/;$(IncludePath)</IncludePath>
+    <OutDir>$(SolutionDir)Build\$(ProjectName)-$(Configuration)-Binary\</OutDir>
+    <IntDir>$(SolutionDir)Build\$(ProjectName)-$(Configuration)-Intermediate\</IntDir>
+    <IncludePath>$(SolutionDir)External/;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -89,26 +89,27 @@
     <None Include="cpp.hint" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="IconsFontAwesome6.h" />
+    <ClInclude Include="IconsFontAwesome6Brands.h" />
     <ClInclude Include="ImConfig.h" />
     <ClInclude Include="ImGui.h" />
+    <ClInclude Include="ImGuiExtension.h" />
     <ClInclude Include="ImGuiGlfw.h" />
     <ClInclude Include="ImGuiVulkan.h" />
     <ClInclude Include="ImGuiInternal.h" />
     <ClInclude Include="ImGuiRectpack.h" />
     <ClInclude Include="ImGuiTextedit.h" />
     <ClInclude Include="ImGuiTruetype.h" />
-    <ClInclude Include="ImNodes.h" />
-    <ClInclude Include="ImnodesInternal.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ImGui.cpp" />
     <ClCompile Include="ImGuiDemo.cpp" />
     <ClCompile Include="ImGuiDraw.cpp" />
+    <ClCompile Include="ImGuiExtension.cpp" />
     <ClCompile Include="ImGuiGlfw.cpp" />
     <ClCompile Include="ImGuiVulkan.cpp" />
     <ClCompile Include="ImGuiTables.cpp" />
     <ClCompile Include="ImGuiWidgets.cpp" />
-    <ClCompile Include="ImNodes.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

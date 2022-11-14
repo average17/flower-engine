@@ -1,28 +1,109 @@
+#include "Pch.h"
 #include "SceneNode.h"
-#include "SceneGraph.h"
+#include "Scene.h"
 
-namespace flower 
+namespace Flower
 {
-	SceneNode::SceneNode(const size_t id, const std::string& name)
-        : m_id(id), m_name(name), m_transform(nullptr)
+    void SceneNode::tick(const RuntimeModuleTickData& tickData)
     {
-        LOG_TRACE("SceneNode {0} with GUID {1} construct.", m_name.c_str(), m_id);
+        for (auto& comp : m_components)
+        {
+            comp.second->tick(tickData);
+        }
     }
 
-    std::shared_ptr<SceneNode> SceneNode::create(const size_t id, const std::string& name, std::weak_ptr<Scene> scene)
+    void SceneNode::removeComponent(const char* type)
     {
-        auto res = std::make_shared<SceneNode>(id, name);
 
-        res->m_transform = std::make_shared<Transform>();
-        res->setComponent(res->m_transform);
+        // When component remove, move to scene's pending kill containers to avoid GPU resource fault.
+
+        m_scene.lock()->getLazyDestroyObjects().insert(m_components.at(type));
+
+
+        m_components.erase(type);
+    }
+
+    std::shared_ptr<SceneNode> SceneNode::create(const size_t id, const std::string& name, std::shared_ptr<Scene> scene)
+    {
+        auto res = std::shared_ptr<SceneNode>(new SceneNode());
+
+        res->m_id = id;
+        res->m_name = name;
+        res->m_runTimeIdName = std::to_string(id);
+
+        res->setComponent(std::make_shared<Transform>(res));
         res->m_scene = scene;
 
+        LOG_TRACE("SceneNode {0} with GUID {1} construct.", res->m_name.c_str(), res->m_id);
         return res;
     }
 
     SceneNode::~SceneNode()
     {
         LOG_TRACE("SceneNode {0} with GUID {1} destroy.", m_name.c_str(), m_id);
+        if (auto scene = m_scene.lock())
+        {
+            scene->m_nodeCount--;
+        }
+    }
+
+    void SceneNode::markDirty()
+    {
+        m_scene.lock()->setDirty();
+    }
+
+    bool SceneNode::canSetNewVisibility()
+    {
+        // Parent is visible, or parent is unvisible but current visible is true;
+        return getParent()->getVisibility() || m_bVisibility;
+    }
+
+    bool SceneNode::canSetNewStatic()
+    {
+        // Parent is static, or parent is un static but current static is false;
+        return getParent()->getStatic() || m_bStatic;
+    }
+
+    void SceneNode::setVisibilityImpl(bool bState, bool bForce)
+    {
+        if (m_bVisibility != bState)
+        {
+            if (!bForce)
+            {
+                // Parent is unvisible, but new state is visible. stop set.
+                if (!canSetNewVisibility())
+                {
+                    return;
+                }
+            }
+
+            m_bVisibility = bState;
+            for (auto& child : m_children)
+            {
+                child->setVisibilityImpl(bState, true);
+            }
+        }
+    }
+
+    void SceneNode::setStaticImpl(bool bState, bool bForce)
+    {
+        if (m_bStatic != bState)
+        {
+            if (!bForce)
+            {
+                // New state is static, but parent is no static, stop set.
+                if (!canSetNewStatic())
+                {
+                    return;
+                }
+            }
+
+            m_bStatic = bState;
+            for (auto& child : m_children)
+            {
+                child->setStaticImpl(bState, true);
+            }
+        }
     }
 
     std::shared_ptr<Component> SceneNode::getComponent(const char* id)
@@ -35,21 +116,6 @@ namespace flower
         {
             return nullptr;
         }
-    }
-
-    std::shared_ptr<Transform> SceneNode::getTransform()
-    {
-        return m_transform;
-    }
-
-    std::shared_ptr<SceneNode> SceneNode::getParent()
-    {
-        return m_parent.lock();
-    }
-
-    std::shared_ptr<SceneNode> SceneNode::getPtr()
-    {
-        return shared_from_this();
     }
 
     bool SceneNode::hasComponent(const char* id)
@@ -68,13 +134,22 @@ namespace flower
             scene->setDirty();
             return true;
         }
-
         return false;
     }
 
     // p is son of this node?
     bool SceneNode::isSon(std::shared_ptr<SceneNode> p)
     {
+        if (p->isRoot())
+        {
+            return false;
+        }
+
+        if (isRoot())
+        {
+            return true;
+        }
+
         std::shared_ptr<SceneNode> pp = p->m_parent.lock();
         while (pp)
         {
@@ -87,10 +162,25 @@ namespace flower
         return false;
     }
 
+    // p is the direct son of this node.
+    bool SceneNode::isSonDirectly(std::shared_ptr<SceneNode> p)
+    {
+        if (p->isRoot())
+        {
+            return false;
+        }
+
+        if (isRoot())
+        {
+            return true;
+        }
+
+        std::shared_ptr<SceneNode> pp = p->m_parent.lock();
+        return pp->getId() == m_id;
+    }
+
     void SceneNode::updateDepth()
     {
-        // maybe we should sync the depth on main tick to avoid 
-        // repeat call when depth change more than once.
         if (auto parent = m_parent.lock())
         {
             m_depth = parent->m_depth + 1;
@@ -104,22 +194,40 @@ namespace flower
     void SceneNode::addChild(std::shared_ptr<SceneNode> child)
     {
         m_children.push_back(child);
+        m_scene.lock()->setDirty();
     }
 
+    // Set p as this node's new parent.
     void SceneNode::setParent(std::shared_ptr<SceneNode> p)
     {
+        if (isRoot())
+        {
+            return;
+        }
+
         // remove old parent's referece if exist.
         if (auto oldP = m_parent.lock())
         {
+            // Just return if parent same.
+            if (oldP->getId() == p->getId())
+            {
+                return;
+            }
+
             oldP->removeChild(getId());
         }
 
         // prepare new reference.
         m_parent = p;
+        setVisibility(p->getVisibility());
+        setStatic(p->getStatic());
         p->addChild(shared_from_this());
 
+        // Only update this node depth.
         updateDepth();
-        m_transform->invalidateWorldMatrix();
+        getTransform()->invalidateWorldMatrix();
+
+        m_scene.lock()->setDirty();
     }
 
     void SceneNode::removeChild(std::shared_ptr<SceneNode> o)
@@ -129,8 +237,6 @@ namespace flower
 
     void SceneNode::removeChild(size_t inId)
     {
-        std::vector<std::shared_ptr<SceneNode>>::iterator it;
-
         size_t id = 0;
         while (m_children[id]->getId() != inId)
         {
@@ -143,6 +249,8 @@ namespace flower
             std::swap(m_children[id], m_children[m_children.size() - 1]);
             m_children.pop_back();
         }
+
+        m_scene.lock()->setDirty();
     }
 
     void SceneNode::selfDelete()

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -13,7 +13,7 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{7db47955-8bae-49b1-bee0-907860e47895}</ProjectGuid>
+    <ProjectGuid>{95217e2d-16de-4eb5-8f44-047e7b1ec475}</ProjectGuid>
     <RootNamespace>Editor</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
@@ -22,14 +22,14 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <CharacterSet>MultiByte</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>MultiByte</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -44,14 +44,12 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(SolutionDir)Build\$(Platform)\$(ProjectName)$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)Build\Intermediate\$(ProjectName)$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)Build\$(ProjectName)-$(Configuration)-Binary\</OutDir>
+    <IntDir>$(SolutionDir)Build\$(ProjectName)-$(Configuration)-Intermediate\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(SolutionDir)Build\$(Platform)\$(ProjectName)$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)Build\Intermediate\$(ProjectName)$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>$(SolutionDir)Build\$(ProjectName)-$(Configuration)-Intermediate\</IntDir>
+    <OutDir>$(SolutionDir)Build\$(ProjectName)-$(Configuration)-Binary\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -60,12 +58,18 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Source\;$(SolutionDir)ThirdParty\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Source/$(ProjectName)/;$(SolutionDir)External/;$(SolutionDir)Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -76,7 +80,9 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Source\;$(SolutionDir)ThirdParty\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Source/$(ProjectName)/;$(SolutionDir)External/;$(SolutionDir)Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -84,59 +90,61 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ProjectReference Include="..\Engine\Engine.vcxproj">
-      <Project>{274398e3-4058-4145-bf92-957be49ee36d}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\ImGui\ImGui.vcxproj">
-      <Project>{51373ddb-e36f-489b-904a-318769b4741f}</Project>
+      <Project>{e88caf1e-44f6-4cd4-a5eb-aea9f0827861}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Editor.h" />
-    <ClInclude Include="Style\Icon.h" />
-    <ClInclude Include="Widget\Asset\Common.h" />
-    <ClInclude Include="Widget\Asset\ContentTreeItem.h" />
-    <ClInclude Include="Widget\Asset\ContentView.h" />
-    <ClInclude Include="Widget\Asset\ContentViewItem.h" />
-    <ClInclude Include="Widget\Console\Console.h" />
-    <ClInclude Include="Widget\Console\WidgetConsole.h" />
-    <ClInclude Include="Widget\DockSpace\DockSpace.h" />
-    <ClInclude Include="Widget\Downbar\Downbar.h" />
-    <ClInclude Include="Widget\Hierarchy\WidgetHierarchy.h" />
-    <ClInclude Include="Widget\DockSpace\Menu.h" />
-    <ClInclude Include="Widget\Inspector\Components\ComponentCommon.h" />
-    <ClInclude Include="Widget\Inspector\WidgetInspector.h" />
-    <ClInclude Include="Widget\Viewport\WidgetViewport.h" />
-    <ClInclude Include="Widget\WidgetCommon.h" />
-    <ClInclude Include="Widget\WidgetDemo.h" />
-    <ClInclude Include="Widget\WidgetInterface.h" />
-    <ClInclude Include="Widget\Asset\WigetAsset.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="Editor.cpp" />
+    <ClCompile Include="EditorAsset.cpp" />
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="Style\Icon.cpp" />
-    <ClCompile Include="Widget\Asset\Common.cpp" />
-    <ClCompile Include="Widget\Asset\ContentTreeItem.cpp" />
-    <ClCompile Include="Widget\Asset\ContentView.cpp" />
-    <ClCompile Include="Widget\Asset\ContentViewItem.cpp" />
-    <ClCompile Include="Widget\Console\Console.cpp" />
-    <ClCompile Include="Widget\Console\WidgetConsole.cpp" />
-    <ClCompile Include="Widget\DockSpace\DockSpace.cpp" />
-    <ClCompile Include="Widget\Downbar\Downbar.cpp" />
-    <ClCompile Include="Widget\Hierarchy\WidgetHierarchy.cpp" />
-    <ClCompile Include="Widget\DockSpace\Menu.cpp" />
-    <ClCompile Include="Widget\Inspector\Components\InspectAtmosphereSky.cpp" />
-    <ClCompile Include="Widget\Inspector\Components\InspectDirectionalLight.cpp" />
-    <ClCompile Include="Widget\Inspector\Components\InspectStaticMesh.cpp" />
-    <ClCompile Include="Widget\Inspector\Components\InspectTransform.cpp" />
-    <ClCompile Include="Widget\Inspector\WidgetInspector.cpp" />
-    <ClCompile Include="Widget\Viewport\WidgetViewport.cpp" />
-    <ClCompile Include="Widget\WidgetCommon.cpp" />
-    <ClCompile Include="Widget\WidgetInterface.cpp" />
-    <ClCompile Include="Widget\Asset\WigetAsset.cpp" />
+    <ClCompile Include="Pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="Widgets\Console.cpp" />
+    <ClCompile Include="Widgets\ContentViewer.cpp" />
+    <ClCompile Include="Widgets\Detail.cpp" />
+    <ClCompile Include="Widgets\Dockspace.cpp" />
+    <ClCompile Include="Widgets\Downbar.cpp" />
+    <ClCompile Include="Editor.cpp" />
+    <ClCompile Include="Widgets\DrawComponent.cpp" />
+    <ClCompile Include="Widgets\DrawComponentDirectionalLight.cpp" />
+    <ClCompile Include="Widgets\DrawComponentLight.cpp" />
+    <ClCompile Include="Widgets\DrawComponentPMX.cpp" />
+    <ClCompile Include="Widgets\DrawComponentSpotLight.cpp" />
+    <ClCompile Include="Widgets\DrawComponentStaticMesh.cpp" />
+    <ClCompile Include="Widgets\MainMenu.cpp" />
+    <ClCompile Include="Widgets\ProjectSelect.cpp" />
+    <ClCompile Include="Widgets\RenderSetting.cpp" />
+    <ClCompile Include="Widgets\SceneOutliner.cpp" />
+    <ClCompile Include="Widgets\Viewport.cpp" />
+    <ClCompile Include="Widgets\ViewportCamera.cpp" />
+    <ClCompile Include="Widgets\Widget.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="EditorAsset.h" />
+    <ClInclude Include="Pch.h" />
+    <ClInclude Include="Widgets\Console.h" />
+    <ClInclude Include="Widgets\ContentViewer.h" />
+    <ClInclude Include="Widgets\Detail.h" />
+    <ClInclude Include="Widgets\Dockspace.h" />
+    <ClInclude Include="Widgets\Downbar.h" />
+    <ClInclude Include="Editor.h" />
+    <ClInclude Include="Widgets\DrawComponent.h" />
+    <ClInclude Include="Widgets\MainMenu.h" />
+    <ClInclude Include="Widgets\ProjectSelect.h" />
+    <ClInclude Include="Widgets\RenderSetting.h" />
+    <ClInclude Include="Widgets\SceneOutliner.h" />
+    <ClInclude Include="Widgets\Viewport.h" />
+    <ClInclude Include="Widgets\ViewportCamera.h" />
+    <ClInclude Include="Widgets\Widget.h" />
+    <ClInclude Include="Widgets\WidgetsHeader.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

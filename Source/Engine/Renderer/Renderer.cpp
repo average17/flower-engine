@@ -1,121 +1,141 @@
+#include "Pch.h"
 #include "Renderer.h"
-#include "../UI/UISystem.h"
+#include "ImGuiPass.h"
+#include "DeferredRenderer/DeferredRenderer.h"
+#include "SceneTextures.h"
+#include "../UI/UIManager.h"
+#include "RenderSettingContext.h"
 
-namespace flower
+namespace Flower
 {
-	RenderStateMonitor GRenderStateMonitor;
+	static AutoCVarFloat cVarRequireUIFPS(
+		"r.Render.UIFps",
+		"Require ui fps, if world renderer is slow, will skip some frame to keep a smooth fps.",
+		"Render",
+		60,
+		CVarFlags::ReadAndWrite
+	);
 
 	Renderer::Renderer(ModuleManager* in, std::string name)
 		: IRuntimeModule(in, name)
 	{
-		m_ui = std::make_unique<ImguiPass>();
-	}
-
-	void Renderer::registerCheck()
-	{
-		// ensure there is uisystem before renderer register.
-		CHECK(m_moduleManager->getRuntimeModule<UISystem>() 
-			&& "you should register UISystem before you register Renderer Module!");
+		
 	}
 
 	bool Renderer::init()
 	{
-		m_ui->init();
-		return true;
-	}
+		RenderSettingManager::get()->reset();
 
-	// simple template for other renderer.
-	// only render ui then submit and present.
-	void Renderer::tick(const TickData& tickData)
-	{
-		// do nothing if no foucus.
-		if(tickData.bIsMinimized || tickData.bLoseFocus)
-		{
-			return;
-		}
-
-		uint32_t backBufferIndex = RHI::get()->acquireNextPresentImage();
-
-		// UI rendering.
-		{
-			m_ui->renderFrame(backBufferIndex);
-
-			auto frameStartSemaphore = RHI::get()->getCurrentFrameWaitSemaphoreRef();
-			auto frameEndSemaphore   = RHI::get()->getCurrentFrameFinishSemaphore();
-
-			std::vector<VkSemaphore> uiWaitSemaphores = 
-			{ 
-				frameStartSemaphore 
-			};
-
-			std::vector<VkPipelineStageFlags> uiWaitFlags = 
-			{ 
-				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-			};
-
-			VulkanSubmitInfo imguiPassSubmitInfo{};
-			VkCommandBuffer cmd_uiPass = m_ui->getCommandBuffer(backBufferIndex);
-			imguiPassSubmitInfo.setWaitStage(uiWaitFlags)
-				.setWaitSemaphore(uiWaitSemaphores.data(),(int32_t)uiWaitSemaphores.size())
-				.setSignalSemaphore(frameEndSemaphore,1)
-				.setCommandBuffer(&cmd_uiPass,1);
-			std::vector<VkSubmitInfo> submitInfos = { imguiPassSubmitInfo };
-
-			RHI::get()->resetFence();
-			RHI::get()->submit((uint32_t)submitInfos.size(),submitInfos.data());
-			ImGuiCommon::updateAfterSubmit();
-		}
-
-		RHI::get()->present();
-	}
-
-	void Renderer::release()
-	{
-		m_ui->release();
-	}
-
-	OffscreenRenderer::OffscreenRenderer(ModuleManager* in,std::string name)
-		: Renderer(in, name)
-	{
-
-	}
-
-	bool OffscreenRenderer::init()
-	{
-		bool result = Renderer::init();
+		UIManager::get()->init();
+		m_uiPass.init();
+		m_sceneData = std::make_unique<RenderSceneData>();
 
 		// prepare common cmdbuffer and semaphore.
 		{
 			VkSemaphoreCreateInfo semaphoreInfo{};
 			semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-			for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+			for (size_t i = 0; i < GBackBufferCount; i++)
 			{
-				m_dynamicGraphicsCommandBuffer[i] = RHI::get()->createGraphicsCommandBuffer();
-
-				CHECK(vkCreateSemaphore(RHI::get()->getDevice(),&semaphoreInfo,nullptr,&m_dynamicGraphicsCommandExecuteSemaphores[i]) == VK_SUCCESS);
+				m_dynamicGraphicsCommandBuffers[i] = RHI::get()->createMajorGraphicsCommandBuffer();
+				RHICheck(vkCreateSemaphore(RHI::Device, &semaphoreInfo, nullptr, &m_dynamicGraphicsCommandExecuteSemaphores[i]));
 			}
 		}
 
-		return result;
+		StaticTexturesManager::get()->init();
+		return true;
 	}
 
-	void OffscreenRenderer::release()
+	void Renderer::tick(const RuntimeModuleTickData& tickData)
 	{
-		// release common cmdbuffer and semaphore.
+		if (RenderSettingManager::get()->displayMode != RHI::eDisplayMode)
 		{
-			for(size_t i = 0; i < m_dynamicGraphicsCommandBuffer.size(); i++)
-			{
-				delete m_dynamicGraphicsCommandBuffer[i];
-				m_dynamicGraphicsCommandBuffer[i] = nullptr;
-			}
-
-			for(size_t i = 0; i < m_dynamicGraphicsCommandExecuteSemaphores.size(); i++)
-			{
-				vkDestroySemaphore(RHI::get()->getDevice(),m_dynamicGraphicsCommandExecuteSemaphores[i],nullptr);
-			}
+			RHI::eDisplayMode = RenderSettingManager::get()->displayMode;
+			RHI::get()->recreateSwapChain();
 		}
 
-		Renderer::release();
+		// Update scene data.
+		m_sceneData->tick(tickData);
+
+		UIManager::get()->newFrame();
+
+		imguiTickFunctions.broadcast(tickData);
+		ImGui::Render();
+
+		ImDrawData* mainDrawData = ImGui::GetDrawData();
+		const bool bMainMinimized = (mainDrawData->DisplaySize.x <= 0.0f || mainDrawData->DisplaySize.y <= 0.0f);
+		if (!bMainMinimized)
+		{
+			uint32_t backBufferIndex = RHI::get()->acquireNextPresentImage();
+			CHECK(backBufferIndex < GBackBufferCount && "Swapchain backbuffer count should equal to flighting count.");
+
+			StaticTexturesManager::get()->tick();
+
+			VkCommandBuffer graphicsCmd = m_dynamicGraphicsCommandBuffers[backBufferIndex];
+			RHICheck(vkResetCommandBuffer(graphicsCmd, 0));
+			VkCommandBufferBeginInfo cmdBeginInfo = RHICommandbufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+			RHICheck(vkBeginCommandBuffer(graphicsCmd, &cmdBeginInfo));
+			{
+				// Rebuild some global assset.
+				if (RenderSettingManager::get()->ibl.needRebuild())
+				{
+					StaticTexturesManager::get()->rebuildIBL(graphicsCmd, false);
+				}
+
+				// Broadcast renderer tick functions.
+				rendererTickHooks.broadcast(tickData, graphicsCmd);
+			}
+			RHICheck(vkEndCommandBuffer(graphicsCmd));
+
+			// Record ui render.
+			m_uiPass.renderFrame(backBufferIndex);
+
+			auto frameStartSemaphore = RHI::get()->getCurrentFrameWaitSemaphore();
+			auto* graphicsCmdEndSemaphore = &m_dynamicGraphicsCommandExecuteSemaphores[backBufferIndex];
+
+			auto frameEndSemaphore = RHI::get()->getCurrentFrameFinishSemaphore();
+
+			VkPipelineStageFlags waitFlags = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
+
+			std::vector<VkSemaphore> graphicsCmdWaitSemaphores = { frameStartSemaphore };
+			RHISubmitInfo graphicsCmdSubmitInfo{};
+			graphicsCmdSubmitInfo.setWaitStage(&waitFlags)
+				.setWaitSemaphore(&frameStartSemaphore, 1)
+				.setSignalSemaphore(graphicsCmdEndSemaphore, 1)
+				.setCommandBuffer(&graphicsCmd, 1);
+
+			RHISubmitInfo uiCmdSubmitInfo{};
+			VkCommandBuffer uiCmdBuffer = m_uiPass.getCommandBuffer(backBufferIndex);
+			uiCmdSubmitInfo.setWaitStage(&waitFlags)
+				.setWaitSemaphore(graphicsCmdEndSemaphore, 1)
+				.setSignalSemaphore(&frameEndSemaphore, 1)
+				.setCommandBuffer(&uiCmdBuffer, 1);
+
+			std::vector<VkSubmitInfo> infosRawSubmit{ graphicsCmdSubmitInfo, uiCmdSubmitInfo };
+
+			RHI::get()->resetFence();
+			RHI::get()->submit((uint32_t)infosRawSubmit.size(), infosRawSubmit.data());
+		}
+
+		UIManager::get()->updateAfterSubmit();
+
+		if (!bMainMinimized)
+		{
+			RHI::get()->present();
+		}
+	}
+
+	void Renderer::release()
+	{
+		// Free graphics command buffer misc.
+		for (size_t i = 0; i < GBackBufferCount; i++)
+		{
+			vkDestroySemaphore(RHI::Device, m_dynamicGraphicsCommandExecuteSemaphores[i], nullptr);
+		}
+		StaticTexturesManager::get()->release();
+		m_uiPass.release();
+		UIManager::get()->release();
+
+		RenderSettingManager::get()->release();
 	}
 }

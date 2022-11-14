@@ -1,57 +1,133 @@
 #pragma once
+
+#include "Pch.h"
+#include "RendererCommon.h"
+
 #include "../RHI/RHI.h"
-#include <set>
 
-namespace flower
+namespace Flower
 {
-	struct RenderTextureCreateInfo 
-	{
-		VkImageType imageType = VK_IMAGE_TYPE_2D;
-		VkFormat format;
-		VmaMemoryUsage memUsage = VMA_MEMORY_USAGE_GPU_ONLY;
-
-		VkExtent3D extent = { 1, 1, 1};
-		uint32_t mipLevels = 1;
-		uint32_t arrayLayers = 1;
-		VkImageUsageFlags usage;
-		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-		VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
-	};
-
-	// simple render target pool, if temporal render texture mark release.
-	// add to free pool, use for next require pass if hash match.
-	class RenderTexturePool
+	class RenderTexturePool : NonCopyable
 	{
 	public:
-		class RenderTextureReference
+		class PoolImage
 		{
-			friend RenderTexturePool;
 		private:
-			RenderTexturePool* m_pool = nullptr;
-			VulkanImage* m_image      = nullptr;
+			friend class RenderTexturePool;
 
-			uint32_t m_descHash;
-			size_t m_physicalId;
+			size_t m_hashId = ~0;
+
+			// Id for valid state vertify.
+			size_t m_id = ~0;
+
+			uint64_t m_freeCounter = ~0;
+
+			std::weak_ptr<VulkanImage> m_image;
+			RenderTexturePool* m_pool = nullptr;
 
 		public:
-			void release();
+			PoolImage() = default;
+			PoolImage(RenderTexturePool* inPool) : m_pool(inPool) { }
 
-			bool isValid() const;
-			VulkanImage* getImage();
+			void release();
+			bool isValid();
+
+			VulkanImage& getImage();
 		};
-		
+
+		class PoolImageRef : NonCopyable
+		{
+			friend class RenderTexturePool;
+
+		private:
+			PoolImage m_image;
+			explicit PoolImageRef()
+			{
+
+			}
+
+		public:
+			~PoolImageRef()
+			{
+				m_image.release();
+			}
+
+			VulkanImage& getImage()
+			{
+				return m_image.getImage();
+			}
+		};
+
 	private:
-		std::unordered_map<uint32_t, std::vector<VulkanImage*>> m_allocatedImages = {};
-		std::unordered_map<uint32_t, std::set<size_t>> m_freePools = {};
+		friend PoolImage;
+
+		// Recent some pool image release?
+		bool m_bRecentRelease = false;
+		size_t m_idAccumulator = 0;
+		uint64_t m_innerCounter = 0;
+
+		struct PoolImageStorage
+		{
+			std::shared_ptr<VulkanImage> image = nullptr;
+			PoolImage poolInfo;
+
+			explicit PoolImageStorage(RenderTexturePool* inPool)
+				: poolInfo(PoolImage(inPool))
+			{
+
+			}
+		};
+
+		
+		void poolSizeSafeCheck(size_t in) const
+		{
+			sizeSafeCheck(in, 999);
+		}
+
+		// When texture resources release, no immediately free.
+		// We push to our free pools, and when we recreate images, if can reuse, pop and push to busy images pool.
+		std::unordered_map<size_t, std::vector<PoolImageStorage>> m_freeImages;
+		std::unordered_map<size_t, std::vector<PoolImageStorage>> m_busyImages;
+
+		bool shouldRelease(uint64_t freeCounter)
+		{
+			constexpr size_t freePeriod = 1;
+			return m_innerCounter > freeCounter + freePeriod;
+		}
+
+		void releasePoolImage(const PoolImage& in);
 
 	public:
-		// request texture reference.
-		// use release to free texture.
-		// all image view should call requestImageView() to get new one.
-		RenderTextureReference requestRenderTexture(const RenderTextureCreateInfo& info);
+		std::shared_ptr<PoolImageRef> createPoolImage(
+			const char* name, 
+			uint32_t width, 
+			uint32_t height, 
+			VkFormat format, 
+			VkImageUsageFlags usage,
+			int32_t mipmapCount = 1,
+			uint32_t depth = 1,
+			uint32_t arrayLayers = 1,
+			VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT,
+			VkImageCreateFlags flags = 0
+		);
 
-		void release();
+		std::shared_ptr<PoolImageRef> createPoolCubeImage(
+			const char* name,
+			uint32_t width,
+			uint32_t height,
+			VkFormat format,
+			VkImageUsageFlags usage,
+			int32_t mipmapCount = 1,
+			VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT
+		);
+
+		std::shared_ptr<PoolImageRef> createPoolImage(
+			const char* name,
+			const VkImageCreateInfo& createInfo
+		);
+
+		void tick();
 	};
 
-	using RenderTextureRef = RenderTexturePool::RenderTextureReference;
+	using PoolImageSharedRef = std::shared_ptr<RenderTexturePool::PoolImageRef>;
 }
